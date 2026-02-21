@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+librosa
+demucs
+basic-pitch
+python-multipart
