@@ -2,79 +2,118 @@ import os
 import subprocess
 import shutil
 import base64
+import uuid
 import librosa
 import numpy as np
 from basic_pitch.inference import predict_and_save
 
+
 class BassExtractor:
     def __init__(self, file_path: str):
-        self.file_path = file_path
-        self.bpm = None
-        self.bass_path = None
-        self.midi_data_b64 = None
+        self.file_path = os.path.abspath(file_path)
+        self.session_id = uuid.uuid4().hex
+        self.demucs_out_dir = os.path.abspath(f"temp/demucs_{self.session_id}")
+        self.bpm: int | None = None
+        self.bass_path: str | None = None
+        self.midi_data_b64: str | None = None
 
-    def extract_bpm(self):
-        print("Extracting BPM with librosa...")
-        y, sr = librosa.load(self.file_path, sr=None)
+    # ------------------------------------------------------------------
+    # Step 1: BPM Detection
+    # ------------------------------------------------------------------
+    def extract_bpm(self) -> None:
+        print("[BassExtractor] Extracting BPM with librosa...")
+        y, sr = librosa.load(self.file_path, sr=None, mono=True)
         tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
-        
-        if isinstance(tempo, np.ndarray):
-            self.bpm = round(float(tempo[0]))
-        else:
-            self.bpm = round(float(tempo))
-            
-        print(f"Detected BPM: {self.bpm}")
 
-    def isolate_bass(self):
-        print("Isolating bass using Demucs...")
-        filename = os.path.basename(self.file_path)
-        name_no_ext = os.path.splitext(filename)[0]
-        out_dir = "temp/demucs_out"
-        
-        subprocess.run([
-            "demucs",
-            "-n", "htdemucs",
-            "--two-stems", "bass",
-            "-o", out_dir,
-            self.file_path
-        ], check=True)
+        raw = float(tempo[0]) if isinstance(tempo, np.ndarray) else float(tempo)
+        self.bpm = round(raw)
+        print(f"[BassExtractor] Detected BPM: {self.bpm}")
 
-        self.bass_path = os.path.join(out_dir, "htdemucs", name_no_ext, "bass.wav")
-        print(f"Bass isolated at: {self.bass_path}")
+    # ------------------------------------------------------------------
+    # Step 2: Bass Isolation via Demucs
+    # ------------------------------------------------------------------
+    def isolate_bass(self) -> None:
+        print("[BassExtractor] Isolating bass with Demucs (htdemucs)...")
+        os.makedirs(self.demucs_out_dir, exist_ok=True)
 
-    def convert_to_midi(self):
-        print("Converting bass audio to MIDI with basic-pitch...")
-        out_dir = os.path.dirname(self.bass_path)
-        
+        name_no_ext = os.path.splitext(os.path.basename(self.file_path))[0]
+
+        result = subprocess.run(
+            [
+                "demucs",
+                "-n", "htdemucs",
+                "--two-stems", "bass",
+                "-o", self.demucs_out_dir,
+                self.file_path,
+            ],
+            capture_output=True,
+            text=True,
+        )
+
+        if result.returncode != 0:
+            raise RuntimeError(f"Demucs failed:\nSTDOUT: {result.stdout}\nSTDERR: {result.stderr}")
+
+        self.bass_path = os.path.join(
+            self.demucs_out_dir, "htdemucs", name_no_ext, "bass.wav"
+        )
+
+        if not os.path.exists(self.bass_path):
+            raise FileNotFoundError(f"Expected bass stem not found at: {self.bass_path}")
+
+        print(f"[BassExtractor] Bass isolated at: {self.bass_path}")
+
+    # ------------------------------------------------------------------
+    # Step 3: Audio → MIDI via Basic Pitch
+    # ------------------------------------------------------------------
+    def convert_to_midi(self) -> None:
+        print("[BassExtractor] Converting bass to MIDI with Basic Pitch...")
+        midi_out_dir = os.path.dirname(self.bass_path)
+
         predict_and_save(
             audio_path_list=[self.bass_path],
-            output_directory=out_dir,
+            output_directory=midi_out_dir,
             save_midi=True,
             sonify_midi=False,
             save_model_outputs=False,
-            save_notes=False
+            save_notes=False,
         )
-        
-        bass_filename_no_ext = os.path.splitext(os.path.basename(self.bass_path))[0]
-        midi_filepath = os.path.join(out_dir, f"{bass_filename_no_ext}_basic_pitch.mid")
-        
-        with open(midi_filepath, "rb") as f:
-            midi_bytes = f.read()
-            
-        self.midi_data_b64 = base64.b64encode(midi_bytes).decode('utf-8')
-        print("MIDI conversion completed.")
 
-    def cleanup(self):
-        print("Cleaning up temporary files...")
-        if os.path.exists(self.file_path):
-            os.remove(self.file_path)
-            
-        out_dir = "temp/demucs_out"
-        if os.path.exists(out_dir):
-            shutil.rmtree(out_dir, ignore_errors=True)
-        
-    def process_pipeline(self):
-        self.extract_bpm()
-        self.isolate_bass()
-        self.convert_to_midi()
-        return self.bpm, self.midi_data_b64
+        bass_stem_name = os.path.splitext(os.path.basename(self.bass_path))[0]
+        midi_path = os.path.join(midi_out_dir, f"{bass_stem_name}_basic_pitch.mid")
+
+        if not os.path.exists(midi_path):
+            raise FileNotFoundError(f"Expected MIDI file not found at: {midi_path}")
+
+        with open(midi_path, "rb") as f:
+            self.midi_data_b64 = base64.b64encode(f.read()).decode("utf-8")
+
+        print("[BassExtractor] MIDI conversion complete.")
+
+    # ------------------------------------------------------------------
+    # Cleanup: always runs, even on failure
+    # ------------------------------------------------------------------
+    def cleanup(self) -> None:
+        print("[BassExtractor] Running cleanup...")
+        if self.file_path and os.path.exists(self.file_path):
+            try:
+                os.remove(self.file_path)
+            except OSError as e:
+                print(f"[BassExtractor] Warning: could not remove upload file: {e}")
+
+        if os.path.exists(self.demucs_out_dir):
+            shutil.rmtree(self.demucs_out_dir, ignore_errors=True)
+
+        print("[BassExtractor] Cleanup done.")
+
+    # ------------------------------------------------------------------
+    # Full Pipeline
+    # ------------------------------------------------------------------
+    def process_pipeline(self) -> tuple[int, str]:
+        try:
+            self.extract_bpm()
+            self.isolate_bass()
+            self.convert_to_midi()
+            return self.bpm, self.midi_data_b64
+        except Exception:
+            # Re-raise so the route layer handles the HTTP response
+            raise
