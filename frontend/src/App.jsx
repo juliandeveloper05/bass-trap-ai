@@ -8,7 +8,7 @@ import {
 const ALLOWED_TYPES = ['audio/mpeg', 'audio/wav', 'audio/flac', 'audio/ogg'];
 const ALLOWED_EXTS = ['.mp3', '.wav', '.flac', '.ogg'];
 const MAX_SIZE_MB = 100;
-const API_URL = 'http://localhost:8000';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 const LOG_STEPS = [
   { delay: 0,    text: '🎵 Reading audio file...' },
