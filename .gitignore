@@ -6,3 +6,4 @@ __pycache__/
 backend/temp/
 frontend/dist/
 .DS_Store
+*.mid

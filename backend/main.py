@@ -3,8 +3,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from api.routes import router as api_router
 
+# Ensure temp directory exists at startup
+os.makedirs("temp", exist_ok=True)
+
 app = FastAPI(title="Bass Trap API")
 
+# Setup CORS to allow any origin in development
 origins = os.getenv("ALLOWED_ORIGINS", "*").split(",")
 
 app.add_middleware(
@@ -15,7 +19,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(api_router)
+app.include_router(api_router, prefix="/api")
 
 @app.get("/")
 def read_root():

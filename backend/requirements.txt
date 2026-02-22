@@ -1,6 +1,8 @@
-fastapi
-uvicorn
-librosa
-demucs
-basic-pitch
-python-multipart
+fastapi==0.111.0
+uvicorn[standard]==0.29.0
+python-multipart==0.0.9
+librosa==0.10.2
+demucs==4.0.1
+basic-pitch==0.3.3
+numpy<2.0
+soundfile==0.12.1

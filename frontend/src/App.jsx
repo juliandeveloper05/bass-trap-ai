@@ -91,8 +91,8 @@ function ResultCard({ result, onDownload, onReset }) {
 // --- Main App ---
 export default function App() {
   const [file, setFile] = useState(null);
+  const [status, setStatus] = useState('idle'); // 'idle' | 'uploading' | 'processing' | 'done' | 'error'
   const [isDragging, setIsDragging] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
   const [logs, setLogs] = useState([]);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
@@ -139,19 +139,19 @@ export default function App() {
   const handleDragLeave = () => setIsDragging(false);
 
   const handleProcess = async () => {
-    if (!file || isProcessing) return;
+    if (!file || status !== 'idle') return;
 
-    setIsProcessing(true);
+    setStatus('processing');
     setError(null);
     setResult(null);
     setLogs([]);
     startSimulatedLogs();
 
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append('audio_file', file);
 
     try {
-      const response = await fetch(`${API_URL}/process`, {
+      const response = await fetch(`${API_URL}/api/process`, {
         method: 'POST',
         body: formData,
       });
@@ -164,21 +164,25 @@ export default function App() {
       const data = await response.json();
       pushLog('🎉 Done! MIDI is ready.');
       setResult(data);
+      setStatus('done');
     } catch (err) {
       const msg = err.message.includes('Failed to fetch')
         ? 'Cannot reach the backend. Is the FastAPI server running on port 8000?'
         : err.message;
       setError(msg);
+      setStatus('error');
       pushLog(`❌ Error: ${msg}`);
     } finally {
       stopSimulatedLogs();
-      setIsProcessing(false);
+      if (status !== 'error' && status !== 'done') {
+          // Keep the finished status if it succeeded or errored
+      }
     }
   };
 
   const handleDownload = () => {
-    if (!result?.midi) return;
-    const binary = atob(result.midi);
+    if (!result?.midi_b64) return;
+    const binary = atob(result.midi_b64);
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
     const blob = new Blob([bytes], { type: 'audio/midi' });
@@ -197,7 +201,7 @@ export default function App() {
     setResult(null);
     setError(null);
     setLogs([]);
-    setIsProcessing(false);
+    setStatus('idle');
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -231,12 +235,12 @@ export default function App() {
         {/* Drop Zone */}
         {!result && (
           <div
-            onClick={() => !isProcessing && fileInputRef.current?.click()}
+            onClick={() => status !== 'processing' && status !== 'uploading' && fileInputRef.current?.click()}
             onDrop={handleDrop}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             className={`relative border-2 border-dashed rounded-2xl p-8 text-center transition-all duration-200 ${
-              isProcessing
+              (status === 'processing' || status === 'uploading')
                 ? 'cursor-not-allowed opacity-60 border-neutral-700'
                 : isDragging
                 ? 'border-indigo-400 bg-indigo-500/10 cursor-copy'
@@ -251,7 +255,7 @@ export default function App() {
               accept={ALLOWED_EXTS.join(',')}
               onChange={handleFileChange}
               className="hidden"
-              disabled={isProcessing}
+              disabled={status === 'processing' || status === 'uploading'}
             />
 
             {file ? (
@@ -261,7 +265,7 @@ export default function App() {
                   <p className="font-semibold text-emerald-300 truncate max-w-xs">{file.name}</p>
                   <p className="text-neutral-500 text-sm">{formatBytes(file.size)}</p>
                 </div>
-                {!isProcessing && (
+                {(status !== 'processing' && status !== 'uploading') && (
                   <button
                     onClick={removeFile}
                     className="ml-auto text-neutral-500 hover:text-neutral-200 transition-colors cursor-pointer"
@@ -285,7 +289,7 @@ export default function App() {
         )}
 
         {/* Error banner */}
-        {error && (
+        {status === 'error' && error && (
           <div className="mt-4 flex items-start gap-2 bg-red-500/10 border border-red-500/30 text-red-400 rounded-xl p-4 text-sm">
             <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
             <span>{error}</span>
@@ -293,17 +297,17 @@ export default function App() {
         )}
 
         {/* Process button */}
-        {!result && (
+        {status !== 'done' && (
           <button
             onClick={handleProcess}
-            disabled={!file || isProcessing}
+            disabled={!file || status !== 'idle'}
             className={`mt-4 w-full flex items-center justify-center gap-2 font-bold py-4 rounded-2xl transition-all duration-200 text-base ${
-              !file || isProcessing
+              !file || status !== 'idle'
                 ? 'bg-neutral-800 text-neutral-500 cursor-not-allowed'
                 : 'bg-gradient-to-r from-indigo-500 to-cyan-500 hover:from-indigo-400 hover:to-cyan-400 text-white shadow-lg shadow-indigo-500/20 cursor-pointer'
             }`}
           >
-            {isProcessing ? (
+            {status === 'processing' || status === 'uploading' ? (
               <>
                 <Loader2 className="w-5 h-5 animate-spin" />
                 Processing... (may take 1–2 min)
@@ -321,7 +325,7 @@ export default function App() {
         {logs.length > 0 && <LogPanel logs={logs} />}
 
         {/* Result */}
-        {result && (
+        {status === 'done' && result && (
           <ResultCard
             result={result}
             onDownload={handleDownload}
