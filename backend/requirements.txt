@@ -1,3 +1,9 @@
+# Torch CPU-only — instalado por Dockerfile antes de este archivo
+# NO cambiar estas versiones o pip va a resolver CUDA
+torch==2.2.2+cpu
+torchaudio==2.2.2+cpu
+--extra-index-url https://download.pytorch.org/whl/cpu
+
 fastapi==0.111.0
 uvicorn[standard]==0.29.0
 python-multipart==0.0.9
