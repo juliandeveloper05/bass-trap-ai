@@ -1,3 +1,4 @@
+# backend/services/audio_engine.py
 import os
 import subprocess
 import shutil
@@ -6,6 +7,8 @@ import uuid
 import librosa
 import numpy as np
 from basic_pitch.inference import predict_and_save
+
+DEMUCS_MODEL = "mdx_extra_q"
 
 
 class BassExtractor:
@@ -17,23 +20,16 @@ class BassExtractor:
         self.bass_path: str | None = None
         self.midi_data_b64: str | None = None
 
-    # ------------------------------------------------------------------
-    # Step 1: BPM Detection
-    # ------------------------------------------------------------------
     def extract_bpm(self) -> None:
         print("[BassExtractor] Extracting BPM with librosa...")
         y, sr = librosa.load(self.file_path, sr=None, mono=True)
         tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
-
         raw = float(tempo[0]) if isinstance(tempo, np.ndarray) else float(tempo)
         self.bpm = round(raw)
         print(f"[BassExtractor] Detected BPM: {self.bpm}")
 
-    # ------------------------------------------------------------------
-    # Step 2: Bass Isolation via Demucs
-    # ------------------------------------------------------------------
     def isolate_bass(self) -> None:
-        print("[BassExtractor] Isolating bass with Demucs (htdemucs)...")
+        print(f"[BassExtractor] Isolating bass with Demucs ({DEMUCS_MODEL})...")
         os.makedirs(self.demucs_out_dir, exist_ok=True)
 
         name_no_ext = os.path.splitext(os.path.basename(self.file_path))[0]
@@ -41,7 +37,7 @@ class BassExtractor:
         result = subprocess.run(
             [
                 "demucs",
-                "-n", "htdemucs",
+                "-n", DEMUCS_MODEL,
                 "--two-stems", "bass",
                 "-o", self.demucs_out_dir,
                 self.file_path,
@@ -51,20 +47,22 @@ class BassExtractor:
         )
 
         if result.returncode != 0:
-            raise RuntimeError(f"Demucs failed:\nSTDOUT: {result.stdout}\nSTDERR: {result.stderr}")
+            raise RuntimeError(
+                f"Demucs failed:\nSTDOUT: {result.stdout}\nSTDERR: {result.stderr}"
+            )
 
+        # mdx_extra_q output path is: {out_dir}/{model}/{track_name}/bass.wav
         self.bass_path = os.path.join(
-            self.demucs_out_dir, "htdemucs", name_no_ext, "bass.wav"
+            self.demucs_out_dir, DEMUCS_MODEL, name_no_ext, "bass.wav"
         )
 
         if not os.path.exists(self.bass_path):
-            raise FileNotFoundError(f"Expected bass stem not found at: {self.bass_path}")
+            raise FileNotFoundError(
+                f"Expected bass stem not found at: {self.bass_path}"
+            )
 
         print(f"[BassExtractor] Bass isolated at: {self.bass_path}")
 
-    # ------------------------------------------------------------------
-    # Step 3: Audio → MIDI via Basic Pitch
-    # ------------------------------------------------------------------
     def convert_to_midi(self) -> None:
         print("[BassExtractor] Converting bass to MIDI with Basic Pitch...")
         midi_out_dir = os.path.dirname(self.bass_path)
@@ -89,25 +87,19 @@ class BassExtractor:
 
         print("[BassExtractor] MIDI conversion complete.")
 
-    # ------------------------------------------------------------------
-    # Cleanup: always runs, even on failure
-    # ------------------------------------------------------------------
     def cleanup(self) -> None:
         print("[BassExtractor] Running cleanup...")
         if self.file_path and os.path.exists(self.file_path):
             try:
                 os.remove(self.file_path)
             except OSError as e:
-                print(f"[BassExtractor] Warning: could not remove upload file: {e}")
+                print(f"[BassExtractor] Warning: could not remove input file: {e}")
 
         if os.path.exists(self.demucs_out_dir):
             shutil.rmtree(self.demucs_out_dir, ignore_errors=True)
 
         print("[BassExtractor] Cleanup done.")
 
-    # ------------------------------------------------------------------
-    # Full Pipeline
-    # ------------------------------------------------------------------
     def process_pipeline(self) -> tuple[int, str]:
         try:
             self.extract_bpm()
@@ -115,5 +107,4 @@ class BassExtractor:
             self.convert_to_midi()
             return self.bpm, self.midi_data_b64
         except Exception:
-            # Re-raise so the route layer handles the HTTP response
             raise

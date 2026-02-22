@@ -8,11 +8,10 @@ router = APIRouter()
 ALLOWED_EXTENSIONS = {".mp3", ".wav", ".flac", ".ogg"}
 MAX_FILE_SIZE_MB = 100
 
-
 @router.post("/process")
-async def process(file: UploadFile = File(...)):
+async def process(audio_file: UploadFile = File(...)):
     # --- Validate file extension ---
-    ext = os.path.splitext(file.filename)[-1].lower()
+    ext = os.path.splitext(audio_file.filename)[-1].lower()
     if ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(status_code=400, detail=f"Unsupported file type: {ext}. Allowed: {ALLOWED_EXTENSIONS}")
 
@@ -22,7 +21,7 @@ async def process(file: UploadFile = File(...)):
     file_path = os.path.join("temp", safe_filename)
 
     # --- Read and validate file size ---
-    content = await file.read()
+    content = await audio_file.read()
     if len(content) > MAX_FILE_SIZE_MB * 1024 * 1024:
         raise HTTPException(status_code=413, detail=f"File too large. Max size: {MAX_FILE_SIZE_MB}MB.")
 
@@ -32,7 +31,7 @@ async def process(file: UploadFile = File(...)):
     engine = BassExtractor(file_path)
     try:
         bpm, midi = engine.process_pipeline()
-        return {"bpm": bpm, "midi": midi, "filename": file.filename}
+        return {"bpm": bpm, "midi_b64": midi, "filename": audio_file.filename}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Processing failed: {str(e)}")
     finally:
