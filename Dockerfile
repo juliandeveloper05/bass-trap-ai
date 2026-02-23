@@ -25,8 +25,7 @@ RUN pip install --no-cache-dir \
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt \
     && find /usr/local/lib -name "*.pyc" -delete \
-    && find /usr/local/lib -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true \
-    && find /usr/local/lib -name "*.dist-info" -type d -exec rm -rf {} + 2>/dev/null || true
+    && find /usr/local/lib -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
 
 COPY backend/ .
 RUN mkdir -p temp
