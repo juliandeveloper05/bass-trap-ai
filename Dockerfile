@@ -30,6 +30,9 @@ RUN pip install --no-cache-dir -r requirements.txt \
 COPY backend/ .
 RUN mkdir -p temp
 
-EXPOSE 8080
+# Pre-download Demucs model at build time (avoids ~80MB download on each cold start)
+RUN python -c "from demucs.pretrained import get_model; get_model('mdx_extra_q')" 2>/dev/null || true
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080", "--timeout-keep-alive", "300"]
+EXPOSE 7860
+
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7860", "--timeout-keep-alive", "300"]
