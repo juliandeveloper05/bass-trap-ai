@@ -1,5 +1,6 @@
 import os
 import uuid
+import asyncio
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from services.audio_engine import BassExtractor
 
@@ -7,6 +8,15 @@ router = APIRouter()
 
 ALLOWED_EXTENSIONS = {".mp3", ".wav", ".flac", ".ogg"}
 MAX_FILE_SIZE_MB = 100
+
+def _run_pipeline(file_path: str):
+    """Blocking call — runs in a thread so the event loop stays free."""
+    engine = BassExtractor(file_path)
+    try:
+        bpm, midi = engine.process_pipeline()
+        return {"bpm": bpm, "midi_b64": midi}
+    finally:
+        engine.cleanup()
 
 @router.post("/process")
 async def process(audio_file: UploadFile = File(...)):
@@ -28,12 +38,11 @@ async def process(audio_file: UploadFile = File(...)):
     with open(file_path, "wb") as f:
         f.write(content)
 
-    engine = BassExtractor(file_path)
     try:
-        bpm, midi = engine.process_pipeline()
-        return {"bpm": bpm, "midi_b64": midi, "filename": audio_file.filename}
+        # Run in thread so event loop can still respond to health checks
+        result = await asyncio.to_thread(_run_pipeline, file_path)
+        result["filename"] = audio_file.filename
+        return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Processing failed: {str(e)}")
-    finally:
-        # Guaranteed cleanup regardless of success or failure
-        engine.cleanup()
+
