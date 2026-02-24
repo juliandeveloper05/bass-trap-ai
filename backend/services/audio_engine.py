@@ -79,8 +79,15 @@ class BassExtractor:
         bass_stem_name = os.path.splitext(os.path.basename(self.bass_path))[0]
         midi_path = os.path.join(midi_out_dir, f"{bass_stem_name}_basic_pitch.mid")
 
+        # Fallback: glob for any .mid file if exact name doesn't match
         if not os.path.exists(midi_path):
-            raise FileNotFoundError(f"Expected MIDI file not found at: {midi_path}")
+            import glob
+            mid_files = glob.glob(os.path.join(midi_out_dir, "*.mid"))
+            if mid_files:
+                midi_path = mid_files[0]
+                print(f"[BassExtractor] Fallback MIDI found: {midi_path}")
+            else:
+                raise FileNotFoundError(f"No MIDI file found in: {midi_out_dir}")
 
         with open(midi_path, "rb") as f:
             self.midi_data_b64 = base64.b64encode(f.read()).decode("utf-8")
