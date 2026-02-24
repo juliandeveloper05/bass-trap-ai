@@ -8,7 +8,7 @@ os.makedirs("temp", exist_ok=True)
 
 app = FastAPI(title="Bass Trap API")
 
-# Setup CORS to allow any origin in development
+# Setup CORS — tighten ALLOWED_ORIGINS via env var in production
 origins = os.getenv("ALLOWED_ORIGINS", "*").split(",")
 
 app.add_middleware(
