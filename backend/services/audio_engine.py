@@ -1,5 +1,6 @@
 # backend/services/audio_engine.py
 import os
+import glob
 import subprocess
 import shutil
 import base64
@@ -81,7 +82,7 @@ class BassExtractor:
 
         # Fallback: glob for any .mid file if exact name doesn't match
         if not os.path.exists(midi_path):
-            import glob
+            # Basic Pitch varies output naming across versions — glob fallback
             mid_files = glob.glob(os.path.join(midi_out_dir, "*.mid"))
             if mid_files:
                 midi_path = mid_files[0]
