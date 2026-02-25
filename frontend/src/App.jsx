@@ -20,6 +20,7 @@ import { useExtraction, Status } from './hooks/useExtraction'
 import DropZone    from './components/DropZone'
 import LogConsole  from './components/LogConsole'
 import ResultCard  from './components/ResultCard'
+import NotFound    from './components/NotFound'
 
 export default function App() {
   // Selected file — lives here rather than in useExtraction because it's
@@ -58,6 +59,11 @@ export default function App() {
   // Show the drop zone again when idle or on error (so user can retry)
   const showDropZone = !isDone
   const showLogs     = logs.length > 0
+
+  // Lightweight client-side 404 — no router library needed for a single-page app
+  if (window.location.pathname !== '/') {
+    return <NotFound />
+  }
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] flex flex-col">
