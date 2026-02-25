@@ -5,7 +5,11 @@
  * has to parse raw Response objects.
  */
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '/api'
+// VITE_API_URL is set in Vercel to the HF Space origin, e.g.
+// https://julian4deep-bass-trap-ai.hf.space
+// Locally it falls back to localhost:8000.
+// The backend mounts its router at /api, so we append /api here.
+const API_ORIGIN = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
 
 /**
  * Uploads an audio file and starts the full extraction pipeline.
@@ -18,7 +22,7 @@ export async function extractBass(file, signal) {
   const formData = new FormData()
   formData.append('audio_file', file)
 
-  const response = await fetch(`${API_BASE}/process`, {
+  const response = await fetch(`${API_ORIGIN}/api/process`, {
     method: 'POST',
     body: formData,
     signal,
