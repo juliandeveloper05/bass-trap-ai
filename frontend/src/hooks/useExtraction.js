@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
-import { extractBass } from '../api/bassApi'
+import { startJob, getResult } from '../api/bassApi'
+import { useProgressStream } from './useProgressStream'
 
 /** FSM status constants — exported so App.jsx can reference them */
 export const Status = Object.freeze({
@@ -9,73 +10,82 @@ export const Status = Object.freeze({
   ERROR:      'error',
 })
 
-const LOG_STEPS = [
-  { delay: 0,     text: '🎵 Reading audio file...',                         pct: 5  },
-  { delay: 3000,  text: '📊 Detecting BPM with Librosa...',                 pct: 10 },
-  { delay: 8000,  text: '🤖 Demucs isolating bass stem (this takes a while)...', pct: 20 },
-  { delay: 30000, text: '⏳ Demucs is still processing...',                  pct: 40 },
-  { delay: 60000, text: '⏳ Still working… CPU processing takes time.',      pct: 55 },
-  { delay: 90000, text: '🎹 Almost there… converting to MIDI soon.',        pct: 65 },
-  { delay: 120000,text: '🎹 Converting bass audio to MIDI with Basic Pitch...',  pct: 80 },
-  { delay: 180000,text: '✨ Finalizing and encoding MIDI...',                pct: 90 },
-]
-
 /**
  * Custom hook that owns all extraction-related async state.
+ * Now uses real SSE progress events from the backend instead of timers.
+ *
  * Returns { status, logs, result, error, progress, startExtraction, downloadResult, reset }
  */
 export function useExtraction() {
   const [status, setStatus]     = useState(Status.IDLE)
-  const [logs,   setLogs]       = useState([])
   const [result, setResult]     = useState(null)
   const [error,  setError]      = useState(null)
-  const [progress, setProgress] = useState(0)
-  const timersRef = useRef([])
+  const [jobId,  setJobId]      = useState(null)
 
-  const pushLog = useCallback((text) => {
-    setLogs((prev) => [...prev, text])
-  }, [])
+  // SSE stream — activates when jobId is set
+  const {
+    logs: streamLogs,
+    progress: streamProgress,
+    done: streamDone,
+    error: streamError,
+  } = useProgressStream(jobId)
 
-  const clearTimers = useCallback(() => {
-    timersRef.current.forEach(clearTimeout)
-    timersRef.current = []
-  }, [])
+  // Merge stream logs with any local logs (e.g. initial "Uploading..." message)
+  const [localLogs, setLocalLogs] = useState([])
+  const logs     = [...localLogs, ...streamLogs]
+  const progress = jobId ? streamProgress : 0
+
+  // When SSE stream reports done, fetch the final result
+  const fetchingResult = useRef(false)
+  useEffect(() => {
+    if (!streamDone || !jobId || fetchingResult.current) return
+
+    fetchingResult.current = true
+    getResult(jobId)
+      .then((data) => {
+        setResult(data)
+        setStatus(Status.DONE)
+      })
+      .catch((err) => {
+        const msg = err.message || 'Failed to fetch result'
+        setError(msg)
+        setStatus(Status.ERROR)
+        setLocalLogs((prev) => [...prev, `❌ ${msg}`])
+      })
+      .finally(() => {
+        fetchingResult.current = false
+      })
+  }, [streamDone, jobId])
+
+  // If SSE stream reports an error, propagate it
+  useEffect(() => {
+    if (streamError && status === Status.PROCESSING) {
+      setError(streamError)
+      setStatus(Status.ERROR)
+    }
+  }, [streamError, status])
 
   const startExtraction = useCallback(async (file) => {
     // Reset state
     setStatus(Status.PROCESSING)
     setError(null)
     setResult(null)
-    setLogs([])
-    setProgress(0)
-
-    // Start simulated log steps with progress updates
-    clearTimers()
-    timersRef.current = LOG_STEPS.map(({ delay, text, pct }) =>
-      setTimeout(() => {
-        pushLog(text)
-        setProgress(pct)
-      }, delay)
-    )
+    setJobId(null)
+    setLocalLogs(['🎵 Uploading audio file...'])
+    fetchingResult.current = false
 
     try {
-      const data = await extractBass(file)
-      pushLog('🎉 Done! MIDI is ready.')
-      setProgress(100)
-      setResult(data)
-      setStatus(Status.DONE)
+      const { job_id } = await startJob(file)
+      setJobId(job_id) // This triggers the SSE connection via useProgressStream
     } catch (err) {
       const msg = err.message?.includes('Failed to fetch')
         ? 'Cannot reach the backend. Is the server running?'
         : err.message || 'Unknown error'
       setError(msg)
       setStatus(Status.ERROR)
-      setProgress(0)
-      pushLog(`❌ Error: ${msg}`)
-    } finally {
-      clearTimers()
+      setLocalLogs((prev) => [...prev, `❌ Error: ${msg}`])
     }
-  }, [pushLog, clearTimers])
+  }, [])
 
   const downloadResult = useCallback(() => {
     if (!result?.midi_b64) return
@@ -93,13 +103,13 @@ export function useExtraction() {
   }, [result])
 
   const reset = useCallback(() => {
-    clearTimers()
     setStatus(Status.IDLE)
-    setLogs([])
+    setLocalLogs([])
     setResult(null)
     setError(null)
-    setProgress(0)
-  }, [clearTimers])
+    setJobId(null)
+    fetchingResult.current = false
+  }, [])
 
   return { status, logs, result, error, progress, startExtraction, downloadResult, reset }
 }

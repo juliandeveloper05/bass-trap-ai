@@ -5,6 +5,7 @@ import subprocess
 import shutil
 import base64
 import uuid
+from typing import Callable, Optional
 import librosa
 import numpy as np
 from basic_pitch.inference import predict_and_save
@@ -108,11 +109,25 @@ class BassExtractor:
 
         print("[BassExtractor] Cleanup done.")
 
-    def process_pipeline(self) -> tuple[int, str]:
+    def process_pipeline(
+        self,
+        progress_callback: Optional[Callable[[int, str], None]] = None,
+    ) -> tuple[int, str]:
+        def _emit(progress: int, message: str) -> None:
+            if progress_callback:
+                progress_callback(progress, message)
+
         try:
+            _emit(10, "📊 Detecting BPM with Librosa...")
             self.extract_bpm()
+
+            _emit(30, "🤖 Isolating bass with Demucs...")
             self.isolate_bass()
+
+            _emit(85, "🎹 Converting to MIDI with Basic Pitch...")
             self.convert_to_midi()
+
+            _emit(100, "✅ Done. Encoding output...")
             return self.bpm, self.midi_data_b64
         except Exception:
             raise
