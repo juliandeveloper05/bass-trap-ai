@@ -200,15 +200,15 @@ export default function App() {
                 className="text-zinc-600 hover:text-acid-400 transition-colors" aria-label="GitHub">
                 <Github className="w-4 h-4" />
               </a>
-              <a href="https://www.linkedin.com/in/julian-soto-developer" target="_blank" rel="noreferrer"
+              <a href="https://www.linkedin.com/in/full-stack-julian-soto/" target="_blank" rel="noreferrer"
                 className="text-zinc-600 hover:text-acid-400 transition-colors" aria-label="LinkedIn">
                 <Linkedin className="w-4 h-4" />
               </a>
-              <a href="https://www.instagram.com/julian_developer05" target="_blank" rel="noreferrer"
+              <a href="https://www.instagram.com/palee_0x71" target="_blank" rel="noreferrer"
                 className="text-zinc-600 hover:text-acid-400 transition-colors" aria-label="Instagram">
                 <Instagram className="w-4 h-4" />
               </a>
-              <a href="https://juliandeveloper05.github.io/mi-portfolio-2024" target="_blank" rel="noreferrer"
+              <a href="https://juliansoto-portfolio.vercel.app/es" target="_blank" rel="noreferrer"
                 className="text-zinc-600 hover:text-acid-400 transition-colors flex items-center gap-1" aria-label="Portfolio">
                 <ExternalLink className="w-4 h-4" />
                 <span className="font-mono text-xs hidden sm:inline">Portfolio</span>
