@@ -14,7 +14,7 @@
  *   status === error       → show DropZone (re-enabled) + error banner + LogConsole
  */
 import React, { useState, useCallback } from 'react'
-import { AlertCircle, Github, Waves, FileAudio, X, Zap, Loader2, Linkedin, Instagram, Mail, Phone, Heart, ExternalLink } from 'lucide-react'
+import { AlertCircle, Github, Waves, FileAudio, X, Zap, Loader2, Linkedin, Instagram, Mail, Phone, Heart, ExternalLink, Info } from 'lucide-react'
 
 import { useExtraction, Status } from './hooks/useExtraction'
 import DropZone    from './components/DropZone'
@@ -26,6 +26,7 @@ export default function App() {
   // Selected file — lives here rather than in useExtraction because it's
   // purely a UI concern; the hook only cares about it at submission time.
   const [file, setFile] = useState(null)
+  const [showBanner, setShowBanner] = useState(true)
 
   const {
     status,
@@ -80,7 +81,7 @@ export default function App() {
               Dumu
             </span>
             <span className="font-mono text-xs text-zinc-600 border border-zinc-800 rounded px-1.5 py-0.5 ml-1">
-              v1.0
+              v1.2.0
             </span>
           </div>
 
@@ -101,6 +102,30 @@ export default function App() {
       {/* ── Main content ────────────────────────────────────────────────────── */}
       <main className="flex-1 flex items-start justify-center px-4 py-16">
         <div className="w-full max-w-2xl space-y-5">
+
+          {/* ── Info Banner ─────────────────────────────────────────────── */}
+          {showBanner && (
+            <div className="animate-fade-in rounded-xl border border-blue-500/30 bg-blue-500/5 p-4 flex items-start gap-3">
+              <Info className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="font-mono text-sm font-semibold text-blue-300 mb-1">
+                  Processing Time Notice
+                </p>
+                <p className="font-mono text-xs text-blue-300/70 leading-relaxed">
+                  This app runs AI models (Demucs + Basic Pitch) on <strong>CPU</strong>. Processing a full track
+                  takes approximately <strong>3–7 minutes</strong>. The progress bar may stay at high percentages
+                  while neural networks finish their work — <strong>this is normal</strong>. Your MIDI file will
+                  download automatically when ready.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowBanner(false)}
+                className="text-blue-400/50 hover:text-blue-300 transition-colors shrink-0"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
 
           {/* ── Hero headline ─────────────────────────────────────────────── */}
           <div className="text-center mb-10">
