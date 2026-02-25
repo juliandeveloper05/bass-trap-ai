@@ -1,54 +1,66 @@
-/**
- * bassApi.js
- * Centralized API module. All fetch logic lives here — no raw fetch calls
- * scattered across components. Returns typed result objects so the UI never
- * has to parse raw Response objects.
- */
+import { useCallback, useRef, useState } from 'react'
+import { UploadCloud } from 'lucide-react'
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '/api'
+const ALLOWED_EXTS = ['.mp3', '.wav', '.flac', '.ogg', '.aiff', '.m4a']
+const MAX_SIZE_MB  = 100
 
-/**
- * Uploads an audio file and starts the full extraction pipeline.
- *
- * @param {File} file - The audio file to process
- * @param {AbortSignal} [signal] - Optional AbortController signal for cancellation
- * @returns {Promise<{ bpm: number, midi_b64: string, filename: string }>}
- */
-export async function extractBass(file, signal) {
-  const formData = new FormData()
-  formData.append('audio_file', file)
+export default function DropZone({ onFile, disabled = false }) {
+  const [isDragging, setIsDragging] = useState(false)
+  const inputRef = useRef(null)
 
-  const response = await fetch(`${API_BASE}/process`, {
-    method: 'POST',
-    body: formData,
-    signal,
-  })
+  const handleDrop = useCallback((e) => {
+    e.preventDefault()
+    setIsDragging(false)
+    if (disabled) return
+    const file = e.dataTransfer.files?.[0]
+    if (file) onFile(file)
+  }, [disabled, onFile])
 
-  // Always parse the JSON body, even on error — FastAPI puts detail there
-  const data = await response.json().catch(() => ({
-    detail: `Server returned ${response.status} with no JSON body`,
-  }))
+  const handleDragOver = (e) => { e.preventDefault(); if (!disabled) setIsDragging(true) }
+  const handleDragLeave = () => setIsDragging(false)
 
-  if (!response.ok) {
-    // Throw a structured error so the caller can display the backend message
-    const message =
-      typeof data.detail === 'string'
-        ? data.detail
-        : JSON.stringify(data.detail)
-    throw new ApiError(message, response.status)
+  const handleClick = () => {
+    if (!disabled) inputRef.current?.click()
   }
 
-  return data
-}
-
-/**
- * Structured error class so UI can differentiate API errors from
- * network failures (e.g. no `status` on a TypeError).
- */
-export class ApiError extends Error {
-  constructor(message, status) {
-    super(message)
-    this.name = 'ApiError'
-    this.status = status
+  const handleChange = (e) => {
+    const file = e.target.files?.[0]
+    if (file) onFile(file)
+    e.target.value = ''
   }
+
+  return (
+    <div
+      onClick={handleClick}
+      onDrop={handleDrop}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      className={`
+        animate-fade-in
+        border-2 border-dashed rounded-xl p-10 text-center
+        transition-all duration-200 cursor-pointer
+        ${disabled
+          ? 'cursor-not-allowed opacity-40 border-zinc-800'
+          : isDragging
+          ? 'border-acid-400 bg-acid-500/5'
+          : 'border-zinc-800 hover:border-zinc-600 hover:bg-zinc-900/50'}
+      `}
+    >
+      <input
+        ref={inputRef}
+        type="file"
+        accept={ALLOWED_EXTS.join(',')}
+        onChange={handleChange}
+        className="hidden"
+        disabled={disabled}
+      />
+      <UploadCloud className={`w-8 h-8 mx-auto mb-3 ${isDragging ? 'text-acid-400' : 'text-zinc-600'}`} />
+      <p className="font-mono text-sm text-zinc-400">
+        {isDragging ? 'Drop it here' : 'Drag & drop or click to upload'}
+      </p>
+      <p className="font-mono text-xs text-zinc-600 mt-1.5">
+        MP3, WAV, FLAC, OGG · Max {MAX_SIZE_MB}MB
+      </p>
+    </div>
+  )
 }

@@ -1,54 +1,95 @@
-/**
- * bassApi.js
- * Centralized API module. All fetch logic lives here — no raw fetch calls
- * scattered across components. Returns typed result objects so the UI never
- * has to parse raw Response objects.
- */
+import { useState, useCallback, useRef } from 'react'
+import { extractBass } from '../api/bassApi'
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '/api'
+/** FSM status constants — exported so App.jsx can reference them */
+export const Status = Object.freeze({
+  IDLE:       'idle',
+  PROCESSING: 'processing',
+  DONE:       'done',
+  ERROR:      'error',
+})
 
-/**
- * Uploads an audio file and starts the full extraction pipeline.
- *
- * @param {File} file - The audio file to process
- * @param {AbortSignal} [signal] - Optional AbortController signal for cancellation
- * @returns {Promise<{ bpm: number, midi_b64: string, filename: string }>}
- */
-export async function extractBass(file, signal) {
-  const formData = new FormData()
-  formData.append('audio_file', file)
-
-  const response = await fetch(`${API_BASE}/process`, {
-    method: 'POST',
-    body: formData,
-    signal,
-  })
-
-  // Always parse the JSON body, even on error — FastAPI puts detail there
-  const data = await response.json().catch(() => ({
-    detail: `Server returned ${response.status} with no JSON body`,
-  }))
-
-  if (!response.ok) {
-    // Throw a structured error so the caller can display the backend message
-    const message =
-      typeof data.detail === 'string'
-        ? data.detail
-        : JSON.stringify(data.detail)
-    throw new ApiError(message, response.status)
-  }
-
-  return data
-}
+const LOG_STEPS = [
+  { delay: 0,     text: '🎵 Reading audio file...' },
+  { delay: 2000,  text: '📊 Detecting BPM with Librosa...' },
+  { delay: 5000,  text: '🤖 Demucs isolating bass stem (this takes a while)...' },
+  { delay: 15000, text: '⏳ Demucs is still processing...' },
+  { delay: 30000, text: '🎹 Converting bass audio to MIDI with Basic Pitch...' },
+  { delay: 45000, text: '✨ Finalizing and encoding MIDI...' },
+]
 
 /**
- * Structured error class so UI can differentiate API errors from
- * network failures (e.g. no `status` on a TypeError).
+ * Custom hook that owns all extraction-related async state.
+ * Returns { status, logs, result, error, startExtraction, downloadResult, reset }
  */
-export class ApiError extends Error {
-  constructor(message, status) {
-    super(message)
-    this.name = 'ApiError'
-    this.status = status
-  }
+export function useExtraction() {
+  const [status, setStatus] = useState(Status.IDLE)
+  const [logs,   setLogs]   = useState([])
+  const [result, setResult] = useState(null)
+  const [error,  setError]  = useState(null)
+  const timersRef = useRef([])
+
+  const pushLog = useCallback((text) => {
+    setLogs((prev) => [...prev, text])
+  }, [])
+
+  const clearTimers = useCallback(() => {
+    timersRef.current.forEach(clearTimeout)
+    timersRef.current = []
+  }, [])
+
+  const startExtraction = useCallback(async (file) => {
+    // Reset state
+    setStatus(Status.PROCESSING)
+    setError(null)
+    setResult(null)
+    setLogs([])
+
+    // Start simulated log steps
+    clearTimers()
+    timersRef.current = LOG_STEPS.map(({ delay, text }) =>
+      setTimeout(() => pushLog(text), delay)
+    )
+
+    try {
+      const data = await extractBass(file)
+      pushLog('🎉 Done! MIDI is ready.')
+      setResult(data)
+      setStatus(Status.DONE)
+    } catch (err) {
+      const msg = err.message?.includes('Failed to fetch')
+        ? 'Cannot reach the backend. Is the server running?'
+        : err.message || 'Unknown error'
+      setError(msg)
+      setStatus(Status.ERROR)
+      pushLog(`❌ Error: ${msg}`)
+    } finally {
+      clearTimers()
+    }
+  }, [pushLog, clearTimers])
+
+  const downloadResult = useCallback(() => {
+    if (!result?.midi_b64) return
+    const binary = atob(result.midi_b64)
+    const bytes = new Uint8Array(binary.length)
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+    const blob = new Blob([bytes], { type: 'audio/midi' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = `${result.filename?.replace(/\.[^.]+$/, '') || 'bass'}_extracted.mid`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(a.href)
+  }, [result])
+
+  const reset = useCallback(() => {
+    clearTimers()
+    setStatus(Status.IDLE)
+    setLogs([])
+    setResult(null)
+    setError(null)
+  }, [clearTimers])
+
+  return { status, logs, result, error, startExtraction, downloadResult, reset }
 }

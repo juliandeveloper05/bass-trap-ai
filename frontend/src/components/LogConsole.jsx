@@ -1,54 +1,36 @@
-/**
- * bassApi.js
- * Centralized API module. All fetch logic lives here — no raw fetch calls
- * scattered across components. Returns typed result objects so the UI never
- * has to parse raw Response objects.
- */
+import { useEffect, useRef } from 'react'
+import { Terminal } from 'lucide-react'
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '/api'
+export default function LogConsole({ logs, isLive = false }) {
+  const bottomRef = useRef(null)
 
-/**
- * Uploads an audio file and starts the full extraction pipeline.
- *
- * @param {File} file - The audio file to process
- * @param {AbortSignal} [signal] - Optional AbortController signal for cancellation
- * @returns {Promise<{ bpm: number, midi_b64: string, filename: string }>}
- */
-export async function extractBass(file, signal) {
-  const formData = new FormData()
-  formData.append('audio_file', file)
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [logs])
 
-  const response = await fetch(`${API_BASE}/process`, {
-    method: 'POST',
-    body: formData,
-    signal,
-  })
+  if (!logs.length) return null
 
-  // Always parse the JSON body, even on error — FastAPI puts detail there
-  const data = await response.json().catch(() => ({
-    detail: `Server returned ${response.status} with no JSON body`,
-  }))
-
-  if (!response.ok) {
-    // Throw a structured error so the caller can display the backend message
-    const message =
-      typeof data.detail === 'string'
-        ? data.detail
-        : JSON.stringify(data.detail)
-    throw new ApiError(message, response.status)
-  }
-
-  return data
-}
-
-/**
- * Structured error class so UI can differentiate API errors from
- * network failures (e.g. no `status` on a TypeError).
- */
-export class ApiError extends Error {
-  constructor(message, status) {
-    super(message)
-    this.name = 'ApiError'
-    this.status = status
-  }
+  return (
+    <div className="animate-fade-in rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 max-h-48 overflow-y-auto">
+      <div className="flex items-center gap-2 mb-3">
+        <Terminal className="w-3.5 h-3.5 text-zinc-500" />
+        <span className="font-mono text-xs text-zinc-500 tracking-wide">
+          Processing Log
+        </span>
+        {isLive && (
+          <span className="w-1.5 h-1.5 rounded-full bg-acid-500 animate-blink ml-auto" />
+        )}
+      </div>
+      {logs.map((log, i) => (
+        <p key={i} className={`font-mono text-xs leading-relaxed ${
+          log.startsWith('❌') ? 'text-red-400' :
+          log.startsWith('🎉') ? 'text-acid-400' :
+          'text-zinc-400'
+        }`}>
+          {log}
+        </p>
+      ))}
+      <div ref={bottomRef} />
+    </div>
+  )
 }

@@ -14,11 +14,10 @@
  *   status === error       → show DropZone (re-enabled) + error banner + LogConsole
  */
 import React, { useState, useCallback } from 'react'
-import { AlertCircle, Github, Waves } from 'lucide-react'
+import { AlertCircle, Github, Waves, FileAudio, X, Zap, Loader2 } from 'lucide-react'
 
 import { useExtraction, Status } from './hooks/useExtraction'
 import DropZone    from './components/DropZone'
-import FilePreview from './components/FilePreview'
 import LogConsole  from './components/LogConsole'
 import ResultCard  from './components/ResultCard'
 
@@ -118,12 +117,37 @@ export default function App() {
 
           {/* ── File preview + Extract CTA ────────────────────────────────── */}
           {file && !isDone && (
-            <FilePreview
-              file={file}
-              onStart={handleStart}
-              onClear={handleReset}
-              isProcessing={isProcessing}
-            />
+            <div className="animate-fade-in rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 space-y-4">
+              <div className="flex items-center gap-3">
+                <FileAudio className="w-5 h-5 text-acid-400 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="font-mono text-sm text-zinc-200 truncate">{file.name}</p>
+                  <p className="font-mono text-xs text-zinc-600">
+                    {file.size < 1024*1024 ? `${(file.size/1024).toFixed(1)} KB` : `${(file.size/(1024*1024)).toFixed(1)} MB`}
+                  </p>
+                </div>
+                {!isProcessing && (
+                  <button onClick={handleReset} className="text-zinc-600 hover:text-zinc-300 transition-colors">
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+              <button
+                onClick={handleStart}
+                disabled={isProcessing}
+                className={`w-full flex items-center justify-center gap-2 font-mono text-sm font-semibold py-3 rounded-lg transition-all duration-200 ${
+                  isProcessing
+                    ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
+                    : 'bg-acid-500 text-black hover:bg-acid-400 shadow-[0_0_20px_rgba(163,230,53,0.2)]'
+                }`}
+              >
+                {isProcessing ? (
+                  <><Loader2 className="w-4 h-4 animate-spin" /> Processing... (may take 1–2 min)</>
+                ) : (
+                  <><Zap className="w-4 h-4" /> Extract Bass to MIDI</>
+                )}
+              </button>
+            </div>
           )}
 
           {/* ── Log console ───────────────────────────────────────────────── */}
