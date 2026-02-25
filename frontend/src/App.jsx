@@ -32,6 +32,7 @@ export default function App() {
     logs,
     result,
     error,
+    progress,
     startExtraction,
     downloadResult,
     reset,
@@ -154,6 +155,29 @@ export default function App() {
                   <><Zap className="w-4 h-4" /> Extract Bass to MIDI</>
                 )}
               </button>
+
+              {/* ── Animated Progress Bar ──────────────────────────────── */}
+              {isProcessing && (
+                <div className="space-y-2">
+                  <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-acid-500 to-acid-400 rounded-full transition-all duration-1000 ease-out"
+                      style={{ width: `${progress}%` }}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <p className="font-mono text-[10px] text-zinc-500">
+                      {progress < 20 ? 'Initializing pipeline...' :
+                       progress < 50 ? 'Demucs AI separation (CPU)...' :
+                       progress < 80 ? 'Neural processing...' :
+                       progress < 100 ? 'Encoding MIDI...' : 'Complete!'}
+                    </p>
+                    <span className="font-mono text-[10px] text-acid-400/70 tabular-nums">
+                      {progress}%
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
