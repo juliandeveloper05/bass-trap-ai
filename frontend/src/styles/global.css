@@ -1,159 +1,49 @@
-/* styles/global.css
-   Design token layer — all colors, fonts, and spacing come from here.
-   Tailwind classes reference these values via the tailwind.config.js theme.
-   ─────────────────────────────────────────────────────────────────────── */
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* ── Google Fonts ──────────────────────────────────────────────────────── */
-/* Loaded via <link> in index.html for optimal LCP performance */
-
-/* ── CSS Custom Properties (tokens) ───────────────────────────────────── */
-:root {
-  --color-base:     #050510;
-  --color-surface:  #0A0F1F;
-  --color-electric: #00F0FF;
-  --color-purple:   #9D00FF;
-  --color-plasma:   #FF006E;
-  --color-dim:      #1A1F3A;
-  --color-muted:    #4A5080;
-
-  --font-mono:    'JetBrains Mono', ui-monospace, monospace;
-  --font-display: 'Space Grotesk',  system-ui, sans-serif;
-}
-
-/* ── Base Reset ────────────────────────────────────────────────────────── */
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
-html,
-body,
-#root {
-  height: 100%;
-  width: 100%;
-  overflow-x: hidden;
-}
-
-body {
-  background-color: var(--color-base);
-  color: #C8D0F0;
-  font-family: var(--font-mono);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-/* ── Text Selection ────────────────────────────────────────────────────── */
-::selection {
-  background: rgba(0, 240, 255, 0.2);
-  color: #00F0FF;
-}
-
-/* ── Scrollbar ─────────────────────────────────────────────────────────── */
+/* Scrollbar — minimal, dark */
 ::-webkit-scrollbar {
   width: 4px;
+  height: 4px;
 }
 ::-webkit-scrollbar-track {
-  background: var(--color-surface);
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--color-dim);
-  border-radius: 2px;
+  background: #3f3f46;
+  border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--color-muted);
+  background: #52525b;
 }
 
-/* ── Utility: hide scrollbar but keep scroll behavior ──────────────────── */
-.scrollbar-hidden {
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-.scrollbar-hidden::-webkit-scrollbar { display: none; }
-
-/* ── Animations ────────────────────────────────────────────────────────── */
-
-/* Scanline overlay — single horizontal bar sweeping down the screen */
-@keyframes scanline {
-  0%   { transform: translateY(-100%); }
-  100% { transform: translateY(100vh); }
+/* Selection color */
+::selection {
+  background: rgba(163, 230, 53, 0.25);
+  color: #d9f99d;
 }
 
-/* Neon flicker — mimics a fluorescent tube with slight instability */
-@keyframes flicker {
-  0%, 100%          { opacity: 1; }
-  92%               { opacity: 1; }
-  93%               { opacity: 0.4; }
-  94%               { opacity: 1; }
-  96%               { opacity: 0.6; }
-  97%               { opacity: 1; }
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
 }
 
-/* Breathing scale — gentle pulsation for idle states */
-@keyframes breathe {
-  0%, 100% { transform: scale(1);    opacity: 0.8; }
-  50%      { transform: scale(1.04); opacity: 1;   }
+/* Log console text glow for acid entries */
+.log-success {
+  color: #a3e635;
+  text-shadow: 0 0 8px rgba(163, 230, 53, 0.35);
 }
 
-/* Materialize — element fades+uncromps in from horizontal scale */
-@keyframes materialize {
-  0%   { opacity: 0; transform: scaleX(0.6); filter: blur(8px); }
-  100% { opacity: 1; transform: scaleX(1);   filter: blur(0);   }
+.log-error {
+  color: #f87171;
+  text-shadow: 0 0 8px rgba(248, 113, 113, 0.35);
 }
 
-/* ── Glow pulse for processing states ──────────────────────────────────── */
-@keyframes glowPulse {
-  0%, 100% { box-shadow: 0 0 8px rgba(0, 240, 255, 0.3); }
-  50%      { box-shadow: 0 0 24px rgba(0, 240, 255, 0.7), 0 0 48px rgba(0, 240, 255, 0.2); }
+.log-info {
+  color: #71717a;
 }
 
-/* ── Spinner for upload/processing states ──────────────────────────────── */
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-/* ── Component utilities ───────────────────────────────────────────────── */
-
-/* Terminal-style text cursor blink */
-.cursor-blink::after {
-  content: '█';
-  animation: flicker 1s step-end infinite;
-  color: var(--color-electric);
-  margin-left: 2px;
-}
-
-/* Neon border — used on drop zone and result cards */
-.border-neon {
-  border: 1px solid rgba(0, 240, 255, 0.3);
-  box-shadow: 0 0 12px rgba(0, 240, 255, 0.1), inset 0 0 12px rgba(0, 240, 255, 0.03);
-}
-
-.border-neon:hover {
-  border-color: rgba(0, 240, 255, 0.6);
-  box-shadow: 0 0 20px rgba(0, 240, 255, 0.25), inset 0 0 20px rgba(0, 240, 255, 0.06);
-  transition: box-shadow 0.3s ease, border-color 0.3s ease;
-}
-
-/* Glass surface — used for overlaying log panels */
-.glass {
-  background: rgba(10, 15, 31, 0.6);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-}
-
-/* Drop zone active state */
-.dz-active {
-  border-color: rgba(0, 240, 255, 0.8) !important;
-  box-shadow: 0 0 32px rgba(0, 240, 255, 0.35), inset 0 0 32px rgba(0, 240, 255, 0.08) !important;
-}
-
-/* ── Three.js canvas baseline ──────────────────────────────────────────── */
-canvas {
-  display: block; /* Removes phantom 4px bottom gap from inline canvas */
+.log-step {
+  color: #d4d4d8;
 }

@@ -1,338 +1,259 @@
-import React, { useState, useRef, useCallback } from 'react';
-import {
-  UploadCloud, Music, Download, Loader2, CheckCircle2,
-  AlertCircle, FileAudio, X, Terminal, Zap
-} from 'lucide-react';
+/**
+ * App.jsx
+ *
+ * Root component. Owns the file selection state (a simple useState<File|null>)
+ * and delegates all async/extraction state to useExtraction(). The component
+ * itself is a pure rendering machine — it reads status and drives which
+ * sub-component is visible.
+ *
+ * State machine:
+ *   file === null          → show DropZone only
+ *   file set, idle         → show DropZone (greyed) + FilePreview with CTA
+ *   status === processing  → show DropZone (disabled) + FilePreview (spinner) + LogConsole
+ *   status === done        → show LogConsole + ResultCard
+ *   status === error       → show DropZone (re-enabled) + error banner + LogConsole
+ */
+import React, { useState, useCallback } from 'react'
+import { AlertCircle, Github, Waves } from 'lucide-react'
 
-// --- Constants ---
-const ALLOWED_TYPES = ['audio/mpeg', 'audio/wav', 'audio/flac', 'audio/ogg'];
-const ALLOWED_EXTS = ['.mp3', '.wav', '.flac', '.ogg'];
-const MAX_SIZE_MB = 100;
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+import { useExtraction, Status } from './hooks/useExtraction'
+import DropZone    from './components/DropZone'
+import FilePreview from './components/FilePreview'
+import LogConsole  from './components/LogConsole'
+import ResultCard  from './components/ResultCard'
 
-const LOG_STEPS = [
-  { delay: 0,    text: '🎵 Reading audio file...' },
-  { delay: 2000, text: '📊 Detecting BPM with Librosa...' },
-  { delay: 5000, text: '🤖 Demucs isolating bass stem (this takes a while)...' },
-  { delay: 15000, text: '⏳ Demucs is still processing...' },
-  { delay: 30000, text: '🎹 Converting bass audio to MIDI with Basic Pitch...' },
-  { delay: 45000, text: '✨ Finalizing and encoding MIDI...' },
-];
-
-// --- Helper ---
-function formatBytes(bytes) {
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function validateFile(file) {
-  if (!file) return 'No file selected.';
-  const ext = '.' + file.name.split('.').pop().toLowerCase();
-  if (!ALLOWED_EXTS.includes(ext)) return `Invalid file type. Allowed: ${ALLOWED_EXTS.join(', ')}`;
-  if (file.size > MAX_SIZE_MB * 1024 * 1024) return `File too large. Max size: ${MAX_SIZE_MB}MB.`;
-  return null;
-}
-
-// --- Sub-components ---
-function LogPanel({ logs }) {
-  const bottomRef = useRef(null);
-  React.useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [logs]);
-
-  return (
-    <div className="mt-6 bg-neutral-950 border border-neutral-800 rounded-xl p-4 h-36 overflow-y-auto font-mono text-xs">
-      <div className="flex items-center gap-2 mb-2 text-neutral-500">
-        <Terminal className="w-3 h-3" />
-        <span>Processing Log</span>
-      </div>
-      {logs.map((log, i) => (
-        <p key={i} className="text-emerald-400 leading-relaxed">{log}</p>
-      ))}
-      <div ref={bottomRef} />
-    </div>
-  );
-}
-
-function ResultCard({ result, onDownload, onReset }) {
-  return (
-    <div className="mt-6 bg-neutral-950 border border-emerald-500/30 rounded-xl p-5">
-      <div className="flex items-center gap-2 mb-4">
-        <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-        <span className="font-semibold text-emerald-400">Extraction Complete</span>
-      </div>
-      <div className="grid grid-cols-2 gap-3 mb-4">
-        <div className="bg-neutral-900 rounded-lg p-3 text-center">
-          <p className="text-neutral-500 text-xs mb-1">Detected BPM</p>
-          <p className="text-2xl font-extrabold text-indigo-400">{result.bpm}</p>
-        </div>
-        <div className="bg-neutral-900 rounded-lg p-3 text-center">
-          <p className="text-neutral-500 text-xs mb-1">Source File</p>
-          <p className="text-sm font-semibold text-neutral-200 truncate">{result.filename}</p>
-        </div>
-      </div>
-      <button
-        onClick={onDownload}
-        className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-500 to-cyan-500 hover:from-indigo-400 hover:to-cyan-400 text-white font-bold py-3 rounded-xl transition-all duration-200 shadow-lg shadow-indigo-500/20 cursor-pointer"
-      >
-        <Download className="w-4 h-4" />
-        Download MIDI
-      </button>
-      <button
-        onClick={onReset}
-        className="w-full mt-2 text-neutral-500 hover:text-neutral-300 text-sm py-2 transition-colors cursor-pointer"
-      >
-        Process another file
-      </button>
-    </div>
-  );
-}
-
-// --- Main App ---
 export default function App() {
-  const [file, setFile] = useState(null);
-  const [status, setStatus] = useState('idle'); // 'idle' | 'uploading' | 'processing' | 'done' | 'error'
-  const [isDragging, setIsDragging] = useState(false);
-  const [logs, setLogs] = useState([]);
-  const [result, setResult] = useState(null);
-  const [error, setError] = useState(null);
-  const fileInputRef = useRef(null);
-  const logTimersRef = useRef([]);
+  // Selected file — lives here rather than in useExtraction because it's
+  // purely a UI concern; the hook only cares about it at submission time.
+  const [file, setFile] = useState(null)
 
-  const pushLog = useCallback((text) => {
-    setLogs(prev => [...prev, text]);
-  }, []);
+  const {
+    status,
+    logs,
+    result,
+    error,
+    startExtraction,
+    downloadResult,
+    reset,
+  } = useExtraction()
 
-  const startSimulatedLogs = useCallback(() => {
-    logTimersRef.current.forEach(clearTimeout);
-    logTimersRef.current = LOG_STEPS.map(({ delay, text }) =>
-      setTimeout(() => pushLog(text), delay)
-    );
-  }, [pushLog]);
+  // ── Handlers ───────────────────────────────────────────────────────────────
 
-  const stopSimulatedLogs = useCallback(() => {
-    logTimersRef.current.forEach(clearTimeout);
-    logTimersRef.current = [];
-  }, []);
+  const handleFile = useCallback((f) => {
+    setFile(f)
+  }, [])
 
-  const applyFile = useCallback((f) => {
-    const err = validateFile(f);
-    if (err) { setError(err); return; }
-    setError(null);
-    setResult(null);
-    setLogs([]);
-    setFile(f);
-  }, []);
+  const handleStart = useCallback(() => {
+    if (file) startExtraction(file)
+  }, [file, startExtraction])
 
-  const handleFileChange = (e) => {
-    if (e.target.files?.[0]) applyFile(e.target.files[0]);
-  };
+  const handleReset = useCallback(() => {
+    reset()
+    setFile(null)
+  }, [reset])
 
-  const handleDrop = useCallback((e) => {
-    e.preventDefault();
-    setIsDragging(false);
-    const dropped = e.dataTransfer.files?.[0];
-    if (dropped) applyFile(dropped);
-  }, [applyFile]);
-
-  const handleDragOver = (e) => { e.preventDefault(); setIsDragging(true); };
-  const handleDragLeave = () => setIsDragging(false);
-
-  const handleProcess = async () => {
-    if (!file || status !== 'idle') return;
-
-    setStatus('processing');
-    setError(null);
-    setResult(null);
-    setLogs([]);
-    startSimulatedLogs();
-
-    const formData = new FormData();
-    formData.append('audio_file', file);
-
-    try {
-      const response = await fetch(`${API_URL}/api/process`, {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({ detail: 'Unknown server error.' }));
-        throw new Error(errData.detail || `Server error: ${response.status}`);
-      }
-
-      const data = await response.json();
-      pushLog('🎉 Done! MIDI is ready.');
-      setResult(data);
-      setStatus('done');
-    } catch (err) {
-      const msg = err.message.includes('Failed to fetch')
-        ? 'Cannot reach the backend. Is the FastAPI server running on port 8000?'
-        : err.message;
-      setError(msg);
-      setStatus('error');
-      pushLog(`❌ Error: ${msg}`);
-    } finally {
-      stopSimulatedLogs();
-      if (status !== 'error' && status !== 'done') {
-          // Keep the finished status if it succeeded or errored
-      }
-    }
-  };
-
-  const handleDownload = () => {
-    if (!result?.midi_b64) return;
-    const binary = atob(result.midi_b64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    const blob = new Blob([bytes], { type: 'audio/midi' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `${result.filename?.replace(/\.[^.]+$/, '') || 'bass'}_extracted.mid`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(a.href);
-  };
-
-  const handleReset = () => {
-    stopSimulatedLogs();
-    setFile(null);
-    setResult(null);
-    setError(null);
-    setLogs([]);
-    setStatus('idle');
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
-
-  const removeFile = (e) => {
-    e.stopPropagation();
-    handleReset();
-  };
+  // ── Derived booleans ───────────────────────────────────────────────────────
+  const isProcessing = status === Status.PROCESSING
+  const isDone       = status === Status.DONE
+  const isError      = status === Status.ERROR
+  // Show the drop zone again when idle or on error (so user can retry)
+  const showDropZone = !isDone
+  const showLogs     = logs.length > 0
 
   return (
-    <div className="min-h-screen bg-neutral-950 font-sans text-neutral-100 flex flex-col items-center justify-center p-6 relative overflow-hidden">
-
-      {/* Background glows */}
-      <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-indigo-600/20 blur-[120px] rounded-full pointer-events-none" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-cyan-600/20 blur-[120px] rounded-full pointer-events-none" />
-
-      <div className="z-10 w-full max-w-2xl bg-neutral-900/60 backdrop-blur-2xl border border-neutral-800 rounded-3xl p-8 md:p-12 shadow-2xl">
-
-        {/* Header */}
-        <div className="text-center mb-10">
-          <div className="inline-flex items-center justify-center p-3 bg-gradient-to-br from-indigo-500 to-cyan-500 rounded-2xl mb-6 shadow-lg shadow-indigo-500/20">
-            <Music className="w-8 h-8 text-white" />
+    <div className="min-h-screen bg-[#0a0a0a] flex flex-col">
+      {/* ── Top nav ─────────────────────────────────────────────────────────── */}
+      <header className="border-b border-zinc-900 px-6 py-4">
+        <div className="max-w-2xl mx-auto flex items-center justify-between">
+          {/* Logo mark */}
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-md bg-acid-500/10 border border-acid-500/30 flex items-center justify-center">
+              <Waves className="w-4 h-4 text-acid-500" />
+            </div>
+            <span className="font-mono text-sm font-semibold text-zinc-100 tracking-tight">
+              Bass Trap
+            </span>
+            <span className="font-mono text-xs text-zinc-600 border border-zinc-800 rounded px-1.5 py-0.5 ml-1">
+              v1.0
+            </span>
           </div>
-          <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight mb-3 text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">
-            Bass Trap
-          </h1>
-          <p className="text-neutral-400 text-base">
-            Upload your track · Isolate the bass · Export to MIDI
-          </p>
+
+          {/* Nav right */}
+          <a
+            href="https://github.com"
+            target="_blank"
+            rel="noreferrer"
+            className="text-zinc-600 hover:text-zinc-300 transition-colors"
+            aria-label="GitHub"
+          >
+            <Github className="w-4 h-4" />
+          </a>
         </div>
+      </header>
 
-        {/* Drop Zone */}
-        {!result && (
-          <div
-            onClick={() => status !== 'processing' && status !== 'uploading' && fileInputRef.current?.click()}
-            onDrop={handleDrop}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            className={`relative border-2 border-dashed rounded-2xl p-8 text-center transition-all duration-200 ${
-              (status === 'processing' || status === 'uploading')
-                ? 'cursor-not-allowed opacity-60 border-neutral-700'
-                : isDragging
-                ? 'border-indigo-400 bg-indigo-500/10 cursor-copy'
-                : file
-                ? 'border-emerald-500/50 bg-emerald-500/5 cursor-pointer'
-                : 'border-neutral-700 hover:border-neutral-500 hover:bg-neutral-800/40 cursor-pointer'
-            }`}
-          >
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept={ALLOWED_EXTS.join(',')}
-              onChange={handleFileChange}
-              className="hidden"
-              disabled={status === 'processing' || status === 'uploading'}
+      {/* ── Main content ────────────────────────────────────────────────────── */}
+      <main className="flex-1 flex items-start justify-center px-4 py-16">
+        <div className="w-full max-w-2xl space-y-5">
+
+          {/* ── Hero headline ─────────────────────────────────────────────── */}
+          <div className="text-center mb-10">
+            <h1 className="font-sans text-3xl font-bold text-zinc-100 tracking-tight mb-2">
+              AI Bass Extraction
+            </h1>
+            <p className="font-mono text-sm text-zinc-500">
+              Upload your track · Isolate the bass · Export to MIDI
+            </p>
+          </div>
+
+          {/* ── Pipeline steps indicator ──────────────────────────────────── */}
+          <PipelineSteps status={status} />
+
+          {/* ── Drop zone ─────────────────────────────────────────────────── */}
+          {showDropZone && (
+            <DropZone
+              onFile={handleFile}
+              disabled={isProcessing}
             />
+          )}
 
-            {file ? (
-              <div className="flex items-center justify-center gap-3">
-                <FileAudio className="w-6 h-6 text-emerald-400 shrink-0" />
-                <div className="text-left">
-                  <p className="font-semibold text-emerald-300 truncate max-w-xs">{file.name}</p>
-                  <p className="text-neutral-500 text-sm">{formatBytes(file.size)}</p>
-                </div>
-                {(status !== 'processing' && status !== 'uploading') && (
-                  <button
-                    onClick={removeFile}
-                    className="ml-auto text-neutral-500 hover:text-neutral-200 transition-colors cursor-pointer"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
-            ) : (
-              <div>
-                <UploadCloud className={`w-10 h-10 mx-auto mb-3 transition-colors ${isDragging ? 'text-indigo-400' : 'text-neutral-600'}`} />
-                <p className="text-neutral-400 font-medium">
-                  {isDragging ? 'Drop it!' : 'Drag & drop or click to upload'}
-                </p>
-                <p className="text-neutral-600 text-sm mt-1">
-                  MP3, WAV, FLAC, OGG · Max {MAX_SIZE_MB}MB
-                </p>
-              </div>
-            )}
-          </div>
-        )}
+          {/* ── File preview + Extract CTA ────────────────────────────────── */}
+          {file && !isDone && (
+            <FilePreview
+              file={file}
+              onStart={handleStart}
+              onClear={handleReset}
+              isProcessing={isProcessing}
+            />
+          )}
 
-        {/* Error banner */}
-        {status === 'error' && error && (
-          <div className="mt-4 flex items-start gap-2 bg-red-500/10 border border-red-500/30 text-red-400 rounded-xl p-4 text-sm">
-            <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-            <span>{error}</span>
-          </div>
-        )}
+          {/* ── Log console ───────────────────────────────────────────────── */}
+          {showLogs && (
+            <LogConsole
+              logs={logs}
+              isLive={isProcessing}
+            />
+          )}
 
-        {/* Process button */}
-        {status !== 'done' && (
-          <button
-            onClick={handleProcess}
-            disabled={!file || status !== 'idle'}
-            className={`mt-4 w-full flex items-center justify-center gap-2 font-bold py-4 rounded-2xl transition-all duration-200 text-base ${
-              !file || status !== 'idle'
-                ? 'bg-neutral-800 text-neutral-500 cursor-not-allowed'
-                : 'bg-gradient-to-r from-indigo-500 to-cyan-500 hover:from-indigo-400 hover:to-cyan-400 text-white shadow-lg shadow-indigo-500/20 cursor-pointer'
-            }`}
-          >
-            {status === 'processing' || status === 'uploading' ? (
-              <>
-                <Loader2 className="w-5 h-5 animate-spin" />
-                Processing... (may take 1–2 min)
-              </>
-            ) : (
-              <>
-                <Zap className="w-5 h-5" />
-                Extract Bass to MIDI
-              </>
-            )}
-          </button>
-        )}
+          {/* ── Error banner ──────────────────────────────────────────────── */}
+          {isError && error && (
+            <ErrorBanner message={error} onDismiss={handleReset} />
+          )}
 
-        {/* Log Panel: shows while processing or after if there are logs */}
-        {logs.length > 0 && <LogPanel logs={logs} />}
+          {/* ── Result card (success state) ───────────────────────────────── */}
+          {isDone && result && (
+            <ResultCard
+              result={result}
+              onDownload={downloadResult}
+              onReset={handleReset}
+            />
+          )}
 
-        {/* Result */}
-        {status === 'done' && result && (
-          <ResultCard
-            result={result}
-            onDownload={handleDownload}
-            onReset={handleReset}
-          />
-        )}
-      </div>
+        </div>
+      </main>
+
+      {/* ── Footer ──────────────────────────────────────────────────────────── */}
+      <footer className="border-t border-zinc-900 py-5 px-6">
+        <p className="text-center font-mono text-xs text-zinc-700">
+          Powered by{' '}
+          <span className="text-zinc-600">Demucs</span> ·{' '}
+          <span className="text-zinc-600">Basic Pitch</span> ·{' '}
+          <span className="text-zinc-600">librosa</span>
+        </p>
+      </footer>
     </div>
-  );
+  )
+}
+
+// ─── Internal sub-components ──────────────────────────────────────────────────
+// These are simple enough to live in App.jsx without their own files.
+
+/**
+ * Three-step visual indicator showing where we are in the pipeline.
+ * Step 1 = Upload · Step 2 = Process · Step 3 = Download
+ */
+function PipelineSteps({ status }) {
+  const steps = [
+    { label: 'Upload',   activeOn: [Status.IDLE, Status.ERROR] },
+    { label: 'Process',  activeOn: [Status.PROCESSING] },
+    { label: 'Download', activeOn: [Status.DONE] },
+  ]
+
+  const activeIndex =
+    status === Status.IDLE || status === Status.ERROR ? 0
+    : status === Status.PROCESSING                    ? 1
+    :                                                   2
+
+  return (
+    <div className="flex items-center justify-center gap-0 mb-6">
+      {steps.map((step, i) => {
+        const isActive   = i === activeIndex
+        const isComplete = i < activeIndex
+
+        return (
+          <React.Fragment key={step.label}>
+            {/* Step circle */}
+            <div className="flex flex-col items-center gap-1.5">
+              <div
+                className={`
+                  w-7 h-7 rounded-full flex items-center justify-center
+                  font-mono text-xs font-bold
+                  transition-all duration-300
+                  ${isComplete ? 'bg-acid-500/20 border border-acid-500/50 text-acid-400'
+                   : isActive  ? 'bg-acid-500 text-black shadow-[0_0_12px_rgba(163,230,53,0.4)]'
+                   :             'bg-surface-700 border border-zinc-800 text-zinc-600'}
+                `}
+              >
+                {isComplete ? '✓' : i + 1}
+              </div>
+              <span
+                className={`font-mono text-xs ${
+                  isActive ? 'text-zinc-300' : 'text-zinc-600'
+                }`}
+              >
+                {step.label}
+              </span>
+            </div>
+
+            {/* Connector line between steps */}
+            {i < steps.length - 1 && (
+              <div
+                className={`
+                  w-16 h-px mx-2 mb-5 transition-all duration-500
+                  ${i < activeIndex ? 'bg-acid-500/40' : 'bg-zinc-800'}
+                `}
+              />
+            )}
+          </React.Fragment>
+        )
+      })}
+    </div>
+  )
+}
+
+/**
+ * Error banner with a dismiss/retry action.
+ */
+function ErrorBanner({ message, onDismiss }) {
+  return (
+    <div className="animate-slide-up flex items-start gap-3 rounded-xl border border-red-500/30 bg-red-500/5 p-4">
+      <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+      <div className="flex-1 min-w-0">
+        <p className="font-mono text-sm font-semibold text-red-400 mb-0.5">
+          Pipeline failed
+        </p>
+        <p className="font-mono text-xs text-red-400/70 break-words">{message}</p>
+      </div>
+      <button
+        onClick={onDismiss}
+        className="
+          shrink-0 font-mono text-xs text-red-500/70 hover:text-red-300
+          border border-red-500/30 hover:border-red-400/50
+          rounded px-2.5 py-1.5
+          transition-colors duration-150
+        "
+      >
+        Try again
+      </button>
+    </div>
+  )
 }
