@@ -14,7 +14,7 @@
  *   status === error       → show DropZone (re-enabled) + error banner + LogConsole
  */
 import React, { useState, useCallback } from 'react'
-import { AlertCircle, Github, Waves, FileAudio, X, Zap, Loader2 } from 'lucide-react'
+import { AlertCircle, Github, Waves, FileAudio, X, Zap, Loader2, Linkedin, Instagram, Mail, Phone, Heart, ExternalLink } from 'lucide-react'
 
 import { useExtraction, Status } from './hooks/useExtraction'
 import DropZone    from './components/DropZone'
@@ -70,22 +70,23 @@ export default function App() {
               <Waves className="w-4 h-4 text-acid-500" />
             </div>
             <span className="font-mono text-sm font-semibold text-zinc-100 tracking-tight">
-              Bass Trap
+              Dumu
             </span>
             <span className="font-mono text-xs text-zinc-600 border border-zinc-800 rounded px-1.5 py-0.5 ml-1">
               v1.0
             </span>
           </div>
 
-          {/* Nav right */}
+          {/* Nav right — links to the actual repo */}
           <a
-            href="https://github.com"
+            href="https://github.com/juliandeveloper05/Dumu-AI-Bass-Extraction"
             target="_blank"
             rel="noreferrer"
-            className="text-zinc-600 hover:text-zinc-300 transition-colors"
-            aria-label="GitHub"
+            className="flex items-center gap-1.5 text-zinc-600 hover:text-zinc-300 transition-colors font-mono text-xs"
+            aria-label="GitHub Repository"
           >
             <Github className="w-4 h-4" />
+            <span className="hidden sm:inline">Source</span>
           </a>
         </div>
       </header>
@@ -176,13 +177,73 @@ export default function App() {
       </main>
 
       {/* ── Footer ──────────────────────────────────────────────────────────── */}
-      <footer className="border-t border-zinc-900 py-5 px-6">
-        <p className="text-center font-mono text-xs text-zinc-700">
-          Powered by{' '}
-          <span className="text-zinc-600">Demucs</span> ·{' '}
-          <span className="text-zinc-600">Basic Pitch</span> ·{' '}
-          <span className="text-zinc-600">librosa</span>
-        </p>
+      <footer className="border-t border-zinc-900 px-6 py-8 mt-auto">
+        <div className="max-w-2xl mx-auto space-y-6">
+
+          {/* Tech stack */}
+          <p className="text-center font-mono text-xs text-zinc-700">
+            Powered by{' '}
+            <span className="text-zinc-500">Demucs</span> ·{' '}
+            <span className="text-zinc-500">Basic Pitch</span> ·{' '}
+            <span className="text-zinc-500">librosa</span>
+          </p>
+
+          {/* Divider */}
+          <div className="border-t border-zinc-900" />
+
+          {/* Social + Contact grid */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+
+            {/* Social links */}
+            <div className="flex items-center gap-4">
+              <a href="https://github.com/juliandeveloper05" target="_blank" rel="noreferrer"
+                className="text-zinc-600 hover:text-acid-400 transition-colors" aria-label="GitHub">
+                <Github className="w-4 h-4" />
+              </a>
+              <a href="https://www.linkedin.com/in/julian-soto-developer" target="_blank" rel="noreferrer"
+                className="text-zinc-600 hover:text-acid-400 transition-colors" aria-label="LinkedIn">
+                <Linkedin className="w-4 h-4" />
+              </a>
+              <a href="https://www.instagram.com/julian_developer05" target="_blank" rel="noreferrer"
+                className="text-zinc-600 hover:text-acid-400 transition-colors" aria-label="Instagram">
+                <Instagram className="w-4 h-4" />
+              </a>
+              <a href="https://juliandeveloper05.github.io/mi-portfolio-2024" target="_blank" rel="noreferrer"
+                className="text-zinc-600 hover:text-acid-400 transition-colors flex items-center gap-1" aria-label="Portfolio">
+                <ExternalLink className="w-4 h-4" />
+                <span className="font-mono text-xs hidden sm:inline">Portfolio</span>
+              </a>
+            </div>
+
+            {/* Contact info */}
+            <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4">
+              <a href="mailto:juliansoto.dev@gmail.com"
+                className="flex items-center gap-1.5 text-zinc-600 hover:text-zinc-300 transition-colors font-mono text-xs">
+                <Mail className="w-3.5 h-3.5" />
+                juliansoto.dev@gmail.com
+              </a>
+              <a href="https://wa.me/5491130666369" target="_blank" rel="noreferrer"
+                className="flex items-center gap-1.5 text-zinc-600 hover:text-zinc-300 transition-colors font-mono text-xs">
+                <Phone className="w-3.5 h-3.5" />
+                +54 9 11 3066-6369
+              </a>
+            </div>
+          </div>
+
+          {/* Copyright */}
+          <div className="text-center space-y-1">
+            <p className="font-mono text-xs text-zinc-600 flex items-center justify-center gap-1">
+              Hecho con <Heart className="w-3 h-3 text-red-500 fill-red-500" /> por{' '}
+              <a href="https://github.com/juliandeveloper05" target="_blank" rel="noreferrer"
+                className="text-zinc-400 hover:text-acid-400 transition-colors">
+                Julian Javier Soto
+              </a>
+            </p>
+            <p className="font-mono text-[10px] text-zinc-700">
+              © 2026 Julian Soto. All rights reserved.
+            </p>
+          </div>
+        </div>
       </footer>
     </div>
   )
