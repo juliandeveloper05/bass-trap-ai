@@ -17,10 +17,11 @@ import React, { useState, useCallback } from 'react'
 import { AlertCircle, Github, Waves, FileAudio, X, Zap, Loader2, Linkedin, Instagram, Mail, Phone, Heart, ExternalLink, Info } from 'lucide-react'
 
 import { useExtraction, Status } from './hooks/useExtraction'
-import DropZone    from './components/DropZone'
-import LogConsole  from './components/LogConsole'
-import ResultCard  from './components/ResultCard'
-import NotFound    from './components/NotFound'
+import DropZone      from './components/DropZone'
+import LogConsole    from './components/LogConsole'
+import ResultCard    from './components/ResultCard'
+import NotFound      from './components/NotFound'
+import NeuralCanvas  from './components/NeuralCanvas'
 
 export default function App() {
   // Selected file — lives here rather than in useExtraction because it's
@@ -181,25 +182,16 @@ export default function App() {
                 )}
               </button>
 
-              {/* ── Animated Progress Bar ──────────────────────────────── */}
+              {/* ── Neural Canvas (Matrix rain) + thin progress bar ──── */}
               {isProcessing && (
-                <div className="space-y-2">
-                  <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden">
+                <div className="space-y-3">
+                  <NeuralCanvas progress={progress} />
+                  {/* Slim progress bar below canvas */}
+                  <div className="w-full h-1 bg-zinc-800 rounded-full overflow-hidden">
                     <div
                       className="h-full bg-gradient-to-r from-acid-500 to-acid-400 rounded-full transition-all duration-1000 ease-out"
-                      style={{ width: `${progress}%` }}
+                      style={{ width: `${progress}%`, boxShadow: '0 0 8px rgba(163,230,53,0.5)' }}
                     />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <p className="font-mono text-[10px] text-zinc-500">
-                      {progress < 20 ? 'Initializing pipeline...' :
-                       progress < 50 ? 'Demucs AI separation (CPU)...' :
-                       progress < 80 ? 'Neural processing...' :
-                       progress < 100 ? 'Encoding MIDI...' : 'Complete!'}
-                    </p>
-                    <span className="font-mono text-[10px] text-acid-400/70 tabular-nums">
-                      {progress}%
-                    </span>
                   </div>
                 </div>
               )}
