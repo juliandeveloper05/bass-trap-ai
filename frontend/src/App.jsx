@@ -82,7 +82,7 @@ export default function App() {
               Dumu
             </span>
             <span className="font-mono text-xs text-zinc-600 border border-zinc-800 rounded px-1.5 py-0.5 ml-1">
-              v1.2.0
+              v1.3.0
             </span>
           </div>
 

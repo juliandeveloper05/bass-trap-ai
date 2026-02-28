@@ -1,6 +1,6 @@
 # 🎵 Dumu — AI Bass Extraction
 
-![Dumu](https://img.shields.io/badge/Dumu-v1.2.0-a3e635?style=flat-square) ![React](https://img.shields.io/badge/React_18-Vite_4-61DAFB?style=flat-square&logo=react) ![FastAPI](https://img.shields.io/badge/FastAPI-0.111-009688?style=flat-square&logo=fastapi) ![PyTorch](https://img.shields.io/badge/PyTorch-2.1_CPU-EE4C2C?style=flat-square&logo=pytorch) ![TensorFlow](https://img.shields.io/badge/TensorFlow-2.15-FF6F00?style=flat-square&logo=tensorflow) ![Docker](https://img.shields.io/badge/Docker-Containerized-2496ED?style=flat-square&logo=docker) ![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)
+![Dumu](https://img.shields.io/badge/Dumu-v1.3.0-a3e635?style=flat-square) ![React](https://img.shields.io/badge/React_18-Vite_4-61DAFB?style=flat-square&logo=react) ![FastAPI](https://img.shields.io/badge/FastAPI-0.111-009688?style=flat-square&logo=fastapi) ![PyTorch](https://img.shields.io/badge/PyTorch-2.1_CPU-EE4C2C?style=flat-square&logo=pytorch) ![TensorFlow](https://img.shields.io/badge/TensorFlow-2.15-FF6F00?style=flat-square&logo=tensorflow) ![Docker](https://img.shields.io/badge/Docker-Containerized-2496ED?style=flat-square&logo=docker) ![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)
 
 > **Upload your track · Isolate the bass with AI · Export to MIDI.**
 
@@ -11,16 +11,15 @@ Dumu is a full-stack AI application that extracts the bass line from any audio f
 
 ---
 
-## ✨ What's New in v1.2.0
+## ✨ What's New in v1.3.0
 
-- ✅ **Animated progress bar** with percentage and stage descriptions
-- ✅ **Info notification** on page load — warns users about CPU processing time
-- ✅ **Full professional footer** with GitHub, LinkedIn, Instagram, Portfolio, email & phone
-- ✅ **404 page** with glitch design for invalid routes
-- ✅ **Fixed Basic Pitch 0.3.x** compatibility (`model_or_model_path`)
-- ✅ **Fixed `diffq` dependency** in Docker — required by Demucs `mdx_extra_q`
-- ✅ **Proper env var alignment** — `VITE_API_URL` consistent across frontend and Vercel
-- ✅ **Increased server timeout** to 300s for large audio files on CPU
+- ✅ **Neural network architecture visualization** — live canvas showing Demucs U-Net and Basic Pitch CNN with animated data particles flowing through layers
+- ✅ **Fixed critical 503 errors** — restructured backend into proper Python packages (`api/`, `services/`)
+- ✅ **Switched to `htdemucs`** — lighter model (~1.5 GB vs ~5 GB), prevents OOM on free tier
+- ✅ **Forced CPU execution** — `--device cpu`, `-j 1`, 10-min timeout on Demucs subprocess
+- ✅ **Added `/health` endpoint** — container health checks for HF Spaces Docker startup
+- ✅ **Cleaned dependencies** — removed torch from `requirements.txt` (Dockerfile handles it), removed `diffq`, `email-validator`
+- ✅ **Removed Railway/nixpacks artifacts** — HF Spaces Docker only, no more `Procfile`, `nixpacks.toml`, `railway.json`
 
 ---
 
@@ -28,10 +27,10 @@ Dumu is a full-stack AI application that extracts the bass line from any audio f
 
 | Model | Created by | Architecture | Purpose |
 |---|---|---|---|
-| **Demucs v4** (`mdx_extra_q`) | Meta AI / Facebook Research | U-Net + Transformer | Source Separation — isolates bass from full mix |
+| **Demucs v4** (`htdemucs`) | Meta AI / Facebook Research | U-Net + Transformer | Source Separation — isolates bass from full mix |
 | **Basic Pitch** | Spotify Research | CNN (Convolutional Neural Network) | Audio-to-MIDI — detects pitch, onset & notes |
 
-Both models run inference on **CPU** using PyTorch and TensorFlow respectively. Processing a full-length WAV can take 3–7 minutes on CPU.
+Both models run inference on **CPU** using PyTorch and TensorFlow respectively. Processing a full-length track takes 3–7 minutes on CPU.
 
 ### Pipeline Architecture
 
@@ -42,7 +41,7 @@ Audio File (MP3/WAV/FLAC/OGG)
 [1] BPM Detection      — Librosa beat_track() · DSP analysis
         │
         ▼
-[2] Bass Isolation      — Demucs mdx_extra_q · Neural network inference (~3-5 min)
+[2] Bass Isolation      — Demucs htdemucs · U-Net + Transformer inference (~3-5 min)
         │
         ▼
 [3] MIDI Conversion     — Basic Pitch predict_and_save() · CNN inference
@@ -54,20 +53,30 @@ Audio File (MP3/WAV/FLAC/OGG)
 [5] Cleanup             — /temp directory wiped regardless of outcome
 ```
 
+### Neural Network Visualization
+
+During processing, the frontend renders a **live canvas** showing the architecture of each neural network as it runs:
+
+- **Demucs (progress 10–84%):** Shows the U-Net encoder layers compressing the signal, the Transformer attention block processing temporal dependencies, and the decoder layers reconstructing the isolated bass stem — with U-Net skip connections (dashed lines) bridging encoder to decoder.
+- **Basic Pitch (progress 85–100%):** Shows the CNN pipeline with convolutional layers extracting spectral features, a dense layer, and three branching outputs: **Pitch**, **Onset**, and **Notes**.
+
+Animated **data particles** flow through active connections in real-time, synchronized with the SSE progress events from the backend.
+
 ---
 
 ## 🎯 Features
 
 ### 🎵 Audio Processing
 - **BPM Detection** — Librosa beat_track() for tempo extraction
-- **Bass Stem Isolation** — Demucs `mdx_extra_q` neural network source separation
+- **Bass Stem Isolation** — Demucs `htdemucs` neural network source separation
 - **Audio → MIDI** — Spotify's Basic Pitch CNN with ICASSP 2022 model
 - Supports **MP3, WAV, FLAC, OGG** · Max 100MB
 
 ### 🖥️ Frontend
+- **Neural network visualization** — live canvas rendering of Demucs U-Net and Basic Pitch CNN architectures with animated data flow
 - **Drag & drop** file upload with visual hover feedback
-- **Animated progress bar** (0–100%) with pipeline stage descriptions
-- **Real-time processing log** with timestamped steps
+- **Real-time SSE progress** — Server-Sent Events streaming progress from backend
+- **Processing log** with timestamped pipeline steps
 - **Info notification on load** — warns about CPU processing time
 - **Pipeline step indicator** — Upload → Process → Download
 - **Result card** with detected BPM and one-click MIDI download
@@ -76,11 +85,16 @@ Audio File (MP3/WAV/FLAC/OGG)
 - Dark theme with acid-green accent color system
 
 ### 🔒 Backend Architecture
-- **Service Pattern** — isolated `BassExtractor` class handles the full pipeline
-- **Non-blocking** — `asyncio.to_thread()` keeps FastAPI responsive
+- **Background job architecture** — `POST /api/process` returns `job_id` instantly, processing runs in background thread
+- **SSE progress streaming** — `GET /api/progress/{job_id}` streams real-time events via Server-Sent Events
+- **Result retrieval** — `GET /api/result/{job_id}` returns final MIDI + BPM after processing completes
+- **Service Pattern** — isolated `BassExtractor` class handles the full AI pipeline
+- **Non-blocking** — `asyncio.to_thread()` keeps FastAPI responsive during long Demucs jobs
+- **Thread-safe job store** — uses `loop.call_soon_threadsafe()` for cross-thread event pushing
 - **Bulletproof cleanup** — `try/finally` guarantees temp files are always removed
 - **UUID-based paths** — prevents path traversal and race conditions
 - **Base64 transfer** — MIDI returned encoded in JSON, never as static files
+- **Health check** — `GET /health` for container startup probing
 - **CORS configured** — Vercel origin whitelisted
 
 ---
@@ -95,7 +109,6 @@ Audio File (MP3/WAV/FLAC/OGG)
 | PyTorch | 2.1.2 (CPU) | ML engine for Demucs |
 | TensorFlow | 2.15 | ML engine for Basic Pitch |
 | Demucs | 4.0.1 | Neural source separation (Meta AI) |
-| diffq | 0.2.4 | Quantization support for Demucs |
 | Basic Pitch | 0.3.3 | Audio-to-MIDI conversion (Spotify) |
 | Librosa | 0.10.2 | Audio analysis & BPM detection |
 | NumPy | <2.0 | Numerical operations |
@@ -107,16 +120,17 @@ Audio File (MP3/WAV/FLAC/OGG)
 | React 18 | Reactive UI with hooks |
 | Vite 4 | Fast dev server & bundler |
 | Tailwind CSS 3 | Utility-first styling |
+| Canvas API | Neural network architecture visualization |
+| EventSource API | SSE streaming for real-time progress |
 | Lucide React | SVG icon library |
-| PostCSS + Autoprefixer | CSS processing |
 
 ### DevOps & Infrastructure
 | Technology | Purpose |
 |---|---|
 | Docker | Containerized backend (layer-optimized) |
-| Hugging Face Spaces | Backend hosting (16GB RAM, CPU) |
-| Vercel | Frontend CDN with auto-deploy |
-| Git | Multi-remote (GitHub + HF) |
+| Hugging Face Spaces | Backend hosting (Docker SDK, CPU, 16GB RAM) |
+| Vercel | Frontend CDN with auto-deploy from GitHub |
+| Git | Multi-remote (GitHub + HF Spaces) |
 | ffmpeg | System audio codec support |
 
 ---
@@ -133,25 +147,40 @@ dumu/
 │   │   ├── styles/
 │   │   │   └── global.css        # Design tokens, animations, keyframes
 │   │   ├── api/
-│   │   │   └── bassApi.js        # Centralized fetch + error handling
+│   │   │   └── bassApi.js        # startJob() + getResult() + ApiError
 │   │   ├── hooks/
-│   │   │   └── useExtraction.js  # FSM hook: idle → processing → done/error
+│   │   │   ├── useExtraction.js  # FSM hook: idle → processing → done/error
+│   │   │   └── useProgressStream.js  # SSE EventSource hook
 │   │   └── components/
+│   │       ├── NeuralCanvas.jsx  # Live neural network architecture visualization
 │   │       ├── DropZone.jsx      # Drag & drop upload
 │   │       ├── LogConsole.jsx    # Processing log with auto-scroll
 │   │       ├── ResultCard.jsx    # BPM display + MIDI download
 │   │       └── NotFound.jsx      # 404 page
 │   ├── vercel.json               # SPA rewrites
 │   ├── vite.config.js            # Dev proxy + build config
-│   ├── tailwind.config.js        # Custom theme (acid colors, fonts)
-│   └── postcss.config.js         # PostCSS + Autoprefixer
-├── hf-space/
-│   ├── Dockerfile                # HF Spaces Docker (non-root, port 7860)
-│   ├── main.py                   # FastAPI app + CORS middleware
-│   ├── audio_engine.py           # BassExtractor — full AI pipeline
-│   ├── routes.py                 # POST /api/process endpoint
-│   └── requirements.txt          # Pinned Python dependencies
-├── backend/                      # Local dev backend (same code)
+│   └── tailwind.config.js        # Custom theme (acid colors, fonts)
+├── backend/
+│   ├── main.py                   # FastAPI app + CORS + /health
+│   ├── api/
+│   │   ├── __init__.py
+│   │   └── routes.py             # /process, /progress/{id}, /result/{id}
+│   ├── services/
+│   │   ├── __init__.py
+│   │   ├── audio_engine.py       # BassExtractor — full AI pipeline
+│   │   └── job_store.py          # Thread-safe in-memory job registry
+│   └── requirements.txt
+├── hf-space/                     # HF Spaces deployment (own git repo)
+│   ├── Dockerfile                # Docker SDK, port 7860, non-root
+│   ├── README.md                 # HF Spaces YAML metadata
+│   ├── main.py
+│   ├── api/
+│   │   └── routes.py
+│   ├── services/
+│   │   ├── audio_engine.py
+│   │   └── job_store.py
+│   └── requirements.txt
+├── Dockerfile                    # Root Dockerfile (backend build)
 └── README.md
 ```
 
@@ -164,6 +193,14 @@ dumu/
 |---|---|---|
 | Frontend | Vercel | [dumu.vercel.app](https://dumu.vercel.app) |
 | Backend | Hugging Face Spaces | [julian4deep-bass-trap-ai.hf.space](https://julian4deep-bass-trap-ai.hf.space) |
+
+### API Endpoints
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/api/process` | Upload audio → returns `{ job_id }` immediately |
+| `GET` | `/api/progress/{job_id}` | SSE stream of `{ progress, message }` events |
+| `GET` | `/api/result/{job_id}` | Final result: `{ bpm, midi_b64, filename }` |
+| `GET` | `/health` | Health check: `{ status: "ok" }` |
 
 ### Environment Variables
 
@@ -235,17 +272,49 @@ docker run -p 7860:7860 dumu
 - [x] Environment variable alignment
 - [x] Increased server timeout to 300s
 
-### Phase 2 — Enhanced Processing 📅 v1.3.0
-- [ ] Real-time progress streaming via SSE
-- [ ] MIDI preview player in the browser
-- [ ] Waveform visualization of isolated bass
-- [ ] Adjustable Basic Pitch parameters
+### Phase 1.3 — Neural Network Visualization & 503 Fix ✅ v1.3.0
+- [x] Live neural network architecture canvas (Demucs U-Net + Basic Pitch CNN)
+- [x] Animated data particle flow synced to SSE progress
+- [x] Background job architecture with SSE streaming
+- [x] Fixed 503 errors — proper Python package structure
+- [x] Switched to `htdemucs` model (CPU-friendly, ~1.5 GB RAM)
+- [x] Forced `--device cpu` with `-j 1` and 10-min timeout
+- [x] Added `/health` endpoint for HF Spaces container probing
+- [x] Removed Railway/nixpacks artifacts — HF Spaces Docker only
 
-### Phase 3 — Advanced AI Features 📅 v2.0.0
-- [ ] Multiple stem export (drums, vocals, other)
-- [ ] Key detection & chord suggestions
-- [ ] MIDI quantization & cleanup
-- [ ] Batch file processing
+### Phase 2 — Enhanced Audio & Visualization 📅 v2.0.0
+- [ ] **Waveform visualization** — render input audio waveform alongside the neural canvas using Web Audio API
+- [ ] **MIDI preview player** — play extracted MIDI directly in the browser using Tone.js synthesizer
+- [ ] **Spectrogram view** — FFT-powered spectrogram of the isolated bass stem (before/after)
+- [ ] **Adjustable Basic Pitch parameters** — let users control onset threshold, minimum note length, and pitch confidence
+- [ ] **Multiple stem export** — extract drums, vocals, bass, and other stems simultaneously using Demucs multi-stem mode
+- [ ] **WebSocket progress** — upgrade from SSE to WebSocket for bidirectional communication and cancellation support
+
+### Phase 3 — Advanced AI & Music Intelligence 📅 v3.0.0
+- [ ] **Key detection** — identify musical key and scale using Krumhansl-Schmuckler algorithm + ML classifier
+- [ ] **Chord progression analysis** — detect chord changes from the harmonic content of the audio
+- [ ] **MIDI quantization & cleanup** — snap notes to grid, remove ghost notes, apply velocity curves
+- [ ] **Smart tempo mapping** — detect tempo changes and rubato in live recordings
+- [ ] **Custom Demucs fine-tuning** — fine-tune htdemucs on bass-heavy genres (funk, jazz, metal) for better isolation
+- [ ] **Multi-model ensemble** — combine multiple separation models and select best output via perceptual quality metric
+
+### Phase 4 — Architecture & Scale 📅 v4.0.0
+- [ ] **Redis job queue** — replace in-memory job store with Redis for persistence across container restarts
+- [ ] **Celery workers** — distribute processing across multiple containers with task routing
+- [ ] **GPU inference** — add GPU-accelerated Demucs inference on HF Spaces Pro (A10G) for 10x speedup
+- [ ] **Model caching with HF Hub** — download models once to persistent volume, avoid cold-start delays
+- [ ] **Rate limiting & auth** — JWT authentication with rate limits per user tier
+- [ ] **S3/GCS output storage** — store processed files in object storage with signed URLs and TTL
+- [ ] **Batch processing API** — upload multiple tracks in a single request with parallel pipeline execution
+
+### Phase 5 — Platform & ML Research 📅 v5.0.0
+- [ ] **User accounts & history** — PostgreSQL-backed user system with processing history and saved results
+- [ ] **DAW plugin (VST3/AU)** — native plugin that sends audio to the Dumu API and receives MIDI in real-time
+- [ ] **Custom neural network training** — allow users to upload labeled training data and fine-tune personal separation models
+- [ ] **Real-time streaming separation** — chunk audio into windows and process with streaming Demucs for live bass extraction
+- [ ] **Hybrid edge/cloud inference** — run lightweight ONNX models on-device for preview, full models on cloud for final output
+- [ ] **Music generation from bass lines** — use extracted MIDI + key/chord analysis to generate drum patterns and harmonies with transformers
+- [ ] **A/B model comparison dashboard** — test different Demucs variants side-by-side with perceptual quality metrics (SDR, SIR, SAR)
 
 ---
 
@@ -277,4 +346,4 @@ This project is licensed under the **MIT License** — see the [LICENSE](LICENSE
 
 ---
 
-**Dumu v1.2.0** — Made with ❤️ and 🧠 by Julian Javier Soto · © 2026
+**Dumu v1.3.0** — Made with ❤️ and 🧠 by Julian Javier Soto · © 2026
