@@ -6,8 +6,7 @@
 
 Dumu is a full-stack AI application that extracts the bass line from any audio file using **two neural networks** — Meta AI's **Demucs** for source separation and Spotify's **Basic Pitch** for audio-to-MIDI conversion — and delivers a playable MIDI file ready for your DAW.
 
-🔗 **Live:** [dumu.surge.sh](https://dumu.surge.sh)  
-🔗 **Live (Mirror):** [dumu.vercel.app](https://dumu.vercel.app)  
+🔗 **Live:** [dumu.vercel.app](https://dumu.vercel.app)  
 🔗 **Backend API:** [julian4deep-bass-trap-ai.hf.space](https://julian4deep-bass-trap-ai.hf.space)
 
 ---
@@ -192,8 +191,7 @@ dumu/
 ### Production
 | Service | Platform | URL |
 |---|---|---|
-| Frontend (Auto) | Vercel | [dumu.vercel.app](https://dumu.vercel.app) |
-| Frontend (Manual) | Surge | [dumu.surge.sh](https://dumu.surge.sh) |
+| Frontend | Vercel | [dumu.vercel.app](https://dumu.vercel.app) |
 | Backend | Hugging Face Spaces | [julian4deep-bass-trap-ai.hf.space](https://julian4deep-bass-trap-ai.hf.space) |
 
 ### API Endpoints
@@ -237,9 +235,6 @@ cd frontend
 npm install --legacy-peer-deps
 npm run dev
 # UI at http://localhost:5173
-
-# To manually deploy frontend updates to Surge (dumu.surge.sh):
-npm run deploy
 ```
 
 #### 3. Docker
