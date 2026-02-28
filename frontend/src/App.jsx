@@ -75,7 +75,9 @@ export default function App() {
         <div className="max-w-2xl mx-auto flex items-center justify-between">
           {/* Logo mark */}
           <div className="flex items-center gap-2.5">
-            <img src="/dumu-favicon.png" alt="Dumu Icon" className="w-7 h-7" />
+            <div className="w-7 h-7 rounded-md bg-acid-500/10 border border-acid-500/30 flex items-center justify-center">
+              <Waves className="w-4 h-4 text-acid-500" />
+            </div>
             <span className="font-mono text-sm font-semibold text-zinc-100 tracking-tight">
               Dumu
             </span>
