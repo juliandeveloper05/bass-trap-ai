@@ -10,7 +10,7 @@ import librosa
 import numpy as np
 from basic_pitch.inference import predict_and_save
 
-DEMUCS_MODEL = "mdx_extra_q"
+DEMUCS_MODEL = "htdemucs"
 
 
 class BassExtractor:
@@ -41,11 +41,14 @@ class BassExtractor:
                 "demucs",
                 "-n", DEMUCS_MODEL,
                 "--two-stems", "bass",
+                "--device", "cpu",
+                "-j", "1",
                 "-o", self.demucs_out_dir,
                 self.file_path,
             ],
             capture_output=True,
             text=True,
+            timeout=600,
         )
 
         if result.returncode != 0:

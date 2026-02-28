@@ -31,7 +31,7 @@ COPY backend/ .
 RUN mkdir -p temp
 
 # Pre-download Demucs model at build time (avoids ~80MB download on each cold start)
-RUN python -c "from demucs.pretrained import get_model; get_model('mdx_extra_q')" 2>/dev/null || true
+RUN python -c "from demucs.pretrained import get_model; get_model('htdemucs')" 2>/dev/null || true
 
 EXPOSE 7860
 
